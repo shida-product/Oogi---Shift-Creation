@@ -403,12 +403,12 @@ function renderCalendar() {
     const dayReqs = state.requests.filter(r => r.date === dateStr);
     let eventsHtml = '';
     dayReqs.slice(0, 3).forEach(r => {
-      let cls = 'cal-evt--other', label = '他';
-      if      (r.request_type === 'off')      { cls = 'cal-evt--off';      label = '休'; }
-      else if (r.request_type === 'am')       { cls = 'cal-evt--am';       label = 'AM'; }
-      else if (r.request_type === 'pm')       { cls = 'cal-evt--pm';       label = 'PM'; }
-      else if (r.request_type === 'dispense') { cls = 'cal-evt--dispense'; label = '調'; }
-      eventsHtml += `<span class="cal-evt ${cls}">${label}</span>`;
+      let cls = 'cal-evt--other';
+      if      (r.request_type === 'off')      { cls = 'cal-evt--off';      }
+      else if (r.request_type === 'am')       { cls = 'cal-evt--am';       }
+      else if (r.request_type === 'pm')       { cls = 'cal-evt--pm';       }
+      else if (r.request_type === 'dispense') { cls = 'cal-evt--dispense'; }
+      eventsHtml += `<span class="cal-evt ${cls}">${escapeHtml(r.staff?.name || '?')}</span>`;
     });
     if (dayReqs.length > 3) {
       eventsHtml += `<span class="cal-evt cal-evt--more">+${dayReqs.length - 3}</span>`;
