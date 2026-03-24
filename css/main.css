@@ -211,6 +211,13 @@
   color: #fff;
   box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
+.staff-chip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-right: 6px;
+}
 
 /* カレンダーグリッド */
 .calendar-grid {
