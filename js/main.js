@@ -25,7 +25,27 @@ const STAFF_COLOR_PALETTE = [
   { bg: '#ecfccb', text: '#4d7c0f' }, // lime
 ];
 
+const STAFF_SPECIFIC_COLORS = {
+  '村上': '#E73B3B',
+  '信太': '#212121',
+  '小野': '#F35F8C',
+  '徳永': '#2ECC87',
+  '木庭': '#47B2F7',
+  '中村': '#FDC02D',
+  '諫早': '#948078',
+  '本庄': '#B38BDC'
+};
+
 function getStaffColor(staffId) {
+  const staff = state.staffList.find(s => s.id === staffId);
+  if (staff) {
+    for (const [key, hex] of Object.entries(STAFF_SPECIFIC_COLORS)) {
+      if (staff.name.includes(key)) {
+        // バックグラウンドに指定色を使用し、文字色は白に統一
+        return { bg: hex, text: '#ffffff' };
+      }
+    }
+  }
   const idx = state.staffList.findIndex(s => s.id === staffId);
   return STAFF_COLOR_PALETTE[Math.max(0, idx) % STAFF_COLOR_PALETTE.length];
 }
@@ -423,13 +443,20 @@ function renderCalendar() {
 
     const dayReqs = state.requests.filter(r => r.date === dateStr);
     let eventsHtml = '';
-    dayReqs.slice(0, 3).forEach(r => {
+    dayReqs.forEach(r => {
       const { bg, text } = getStaffColor(r.staff_id);
-      eventsHtml += `<span class="cal-evt" style="background:${bg};color:${text};">${escapeHtml(r.staff?.name || '?')}</span>`;
+      
+      const fullName = r.staff?.name || '?';
+      const lastName = fullName.split(/[\s　]+/)[0];
+
+      let typeLabel = '';
+      if (r.request_type === 'am') typeLabel = ' AM可';
+      else if (r.request_type === 'pm') typeLabel = ' PM可';
+      else if (r.request_type === 'dispense') typeLabel = ' 調剤';
+      else if (r.request_type === 'other') typeLabel = ' その他';
+
+      eventsHtml += `<span class="cal-evt" style="background:${bg};color:${text};">${escapeHtml(lastName + typeLabel)}</span>`;
     });
-    if (dayReqs.length > 3) {
-      eventsHtml += `<span class="cal-evt cal-evt--more">+${dayReqs.length - 3}</span>`;
-    }
 
     html += `<div class="${classes.join(' ')}" data-date="${dateStr}">
       <div class="cal-date"><span class="cal-date__num${dateStr === todayStr ? ' cal-date__num--today' : ''}">${d}</span></div>

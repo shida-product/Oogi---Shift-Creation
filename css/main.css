@@ -179,9 +179,9 @@
   display: none; /* PCでは非表示 */
 }
 
-/* スタッフチップ（モバイル用横スクロール選択） */
+/* スタッフチップ（モバイル用横スクロール選択は廃止） */
 .staff-chips {
-  display: flex;
+  display: none;
   gap: 8px;
   overflow-x: auto;
   padding: 4px 0 14px;
@@ -607,17 +607,11 @@
   .calendar-wrapper {
     display: block; /* スマホでカレンダー表示 */
   }
-  .toolbar {
-    flex-direction: column;
-    align-items: stretch;
+  .toolbar-surface {
+    justify-content: center;
   }
-  /* 凡例を横スクロール */
-  .legend--chips {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    scrollbar-width: none;
-  }
-  .legend--chips::-webkit-scrollbar { display: none; }
+  /* 凡例はモバイルでは非表示（色で判別可能） */
+  .legend--chips { display: none; }
   /* スタッフ選択ドロップダウンはチップUIに置き換え */
   .staff-selector { display: none; }
   /* ヘッダーナビはアイコンのみ（テキスト非表示） */
