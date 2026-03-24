@@ -417,19 +417,48 @@
 .day-detail__item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
+  gap: 8px;
+  padding: 10px 8px;
   border-bottom: 1px solid var(--color-border);
   font-size: var(--font-size-sm);
+  flex-wrap: wrap;
+  border-radius: var(--radius-sm);
 }
 .day-detail__item:last-child {
   border-bottom: none;
 }
 
-.day-detail__type-badge {
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
+/* タップ可能なイベント行 */
+.day-detail__item--tappable {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  margin: 0 -8px;
+  padding: 10px 8px;
+}
+.day-detail__item--tappable:hover,
+.day-detail__item--tappable:active {
+  background: var(--color-surface-hover);
+}
+
+.day-detail__name {
+  font-weight: 600;
+  flex: 1;
+}
+
+.day-detail__chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.day-detail__note {
   font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  display: block;
+  width: 100%;
+  padding-left: 2px;
+  margin-top: -4px;
 }
 
 /* ================================================================

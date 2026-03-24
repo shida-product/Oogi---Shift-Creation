@@ -481,36 +481,40 @@ function showDayDetail(dateStr) {
         default:         type = 'その他';  evtCls = 'cal-evt--other';    break;
       }
       const note = r.note
-        ? `<span style="font-size:var(--font-size-xs);color:var(--color-text-muted);display:block;margin-top:2px;">${escapeHtml(r.note)}</span>`
+        ? `<span class="day-detail__note">${escapeHtml(r.note)}</span>`
         : '';
-      bodyHtml += `<li class="day-detail__item" style="flex-wrap:wrap;">
-        <span style="font-weight:600;">${escapeHtml(r.staff?.name || '?')}</span>
-        <span class="cal-evt ${evtCls}" style="padding:3px 10px;border-radius:var(--radius-full);">${type}</span>
+      bodyHtml += `<li class="day-detail__item day-detail__item--tappable" data-staff-id="${r.staff_id}" data-date="${dateStr}">
+        <span class="day-detail__name">${escapeHtml(r.staff?.name || '?')}</span>
+        <span class="cal-evt ${evtCls}" style="padding:3px 10px;border-radius:var(--radius-full);flex-shrink:0;">${type}</span>
+        <i data-lucide="chevron-right" class="day-detail__chevron"></i>
         ${note}
       </li>`;
     });
     bodyHtml += '</ul>';
   }
 
-  if (state.selectedStaffId) {
-    bodyHtml += `<button class="btn btn--primary btn--sm" style="width:100%;margin-top:14px;" id="bottom-sheet-add">
-      <i data-lucide="plus" style="width:14px;height:14px;"></i> 希望を登録
-    </button>`;
-  } else {
-    bodyHtml += `<p style="font-size:var(--font-size-xs);color:var(--color-text-muted);margin-top:10px;text-align:center;">担当を選択すると登録できます</p>`;
-  }
+  // 新規登録ボタン（常に表示、スタッフ未選択時はモーダル内で選択）
+  bodyHtml += `<button class="btn btn--primary btn--sm" style="width:100%;margin-top:14px;" id="bottom-sheet-add">
+    <i data-lucide="plus" style="width:14px;height:14px;"></i> 新規登録
+  </button>`;
 
   document.getElementById('bottom-sheet-body').innerHTML = bodyHtml;
   document.getElementById('bottom-sheet-overlay').classList.add('active');
   if (typeof lucide !== 'undefined') lucide.createIcons();
 
-  const addBtn = document.getElementById('bottom-sheet-add');
-  if (addBtn) {
-    addBtn.addEventListener('click', () => {
+  // 既存イベントタップ → 編集モーダル
+  document.querySelectorAll('.day-detail__item--tappable').forEach(item => {
+    item.addEventListener('click', () => {
       closeBottomSheet();
-      openModal(state.selectedStaffId, [dateStr]);
+      openModal(item.dataset.staffId, [item.dataset.date]);
     });
-  }
+  });
+
+  // 新規登録ボタン → 登録モーダル（選択中スタッフ or 先頭スタッフ）
+  document.getElementById('bottom-sheet-add').addEventListener('click', () => {
+    closeBottomSheet();
+    openModal(state.selectedStaffId || state.staffList[0]?.id, [dateStr]);
+  });
 }
 
 function closeBottomSheet() {
