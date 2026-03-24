@@ -10,6 +10,27 @@
 import { supabase } from './supabase-config.js';
 
 // ============================================================
+// スタッフカラーパレット（個人別色分け・カレンダー表示用）
+// ============================================================
+const STAFF_COLOR_PALETTE = [
+  { bg: '#e0e7ff', text: '#4338ca' }, // indigo
+  { bg: '#d1fae5', text: '#059669' }, // emerald
+  { bg: '#fee2e2', text: '#dc2626' }, // rose
+  { bg: '#fef3c7', text: '#d97706' }, // amber
+  { bg: '#e0f2fe', text: '#0284c7' }, // sky
+  { bg: '#ede9fe', text: '#7c3aed' }, // violet
+  { bg: '#fce7f3', text: '#db2777' }, // pink
+  { bg: '#ffedd5', text: '#ea580c' }, // orange
+  { bg: '#cffafe', text: '#0e7490' }, // cyan
+  { bg: '#ecfccb', text: '#4d7c0f' }, // lime
+];
+
+function getStaffColor(staffId) {
+  const idx = state.staffList.findIndex(s => s.id === staffId);
+  return STAFF_COLOR_PALETTE[Math.max(0, idx) % STAFF_COLOR_PALETTE.length];
+}
+
+// ============================================================
 // 祝日データ（日本の祝日）
 // ============================================================
 function getHolidays(year) {
@@ -110,6 +131,8 @@ function bindEvents() {
   document.getElementById('staff-select').addEventListener('change', (e) => {
     state.selectedStaffId = e.target.value;
     localStorage.setItem('selectedStaffId', state.selectedStaffId);
+    renderStaffChips();
+    updateFabVisibility();
   });
 
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
@@ -118,6 +141,20 @@ function bindEvents() {
   });
   document.getElementById('modal-save').addEventListener('click', handleModalSave);
   document.getElementById('modal-delete').addEventListener('click', handleModalDelete);
+
+  // ボトムシート
+  document.getElementById('bottom-sheet-close').addEventListener('click', closeBottomSheet);
+  document.getElementById('bottom-sheet-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeBottomSheet();
+  });
+
+  // FAB：今日の日付でモーダルを開く
+  document.getElementById('fab-add').addEventListener('click', () => {
+    openModal(state.selectedStaffId, [formatDate(new Date())]);
+  });
+
+  // 画面回転・リサイズ対応
+  window.addEventListener('resize', updateFabVisibility);
 
   setupGanttDrag();
   setupGanttHover();
@@ -271,6 +308,7 @@ async function loadRequests() {
 // 月の切り替え
 // ============================================================
 function changeMonth(delta) {
+  closeBottomSheet();
   state.currentMonth += delta;
   if (state.currentMonth > 11) { state.currentMonth = 0; state.currentYear++; }
   else if (state.currentMonth < 0) { state.currentMonth = 11; state.currentYear--; }
@@ -296,6 +334,8 @@ function renderStaffSelect() {
     if (s.id === state.selectedStaffId) opt.selected = true;
     select.appendChild(opt);
   });
+  renderStaffChips();
+  updateFabVisibility();
 }
 
 // ============================================================
@@ -352,7 +392,7 @@ function renderGantt() {
 }
 
 // ============================================================
-// カレンダー描画（スマホ）
+// カレンダー描画（スマホ）- Google Calendar 風
 // ============================================================
 function renderCalendar() {
   const grid = document.getElementById('calendar-grid');
@@ -382,20 +422,18 @@ function renderCalendar() {
     if (isHoliday) classes.push('is-holiday');
 
     const dayReqs = state.requests.filter(r => r.date === dateStr);
-    let badges = '';
+    let eventsHtml = '';
     dayReqs.slice(0, 3).forEach(r => {
-      let cls = 'calendar-badge--other';
-      if (r.request_type === 'off') cls = 'calendar-badge--off';
-      else if (r.request_type === 'am') cls = 'calendar-badge--am';
-      else if (r.request_type === 'pm') cls = 'calendar-badge--pm';
-      else if (r.request_type === 'dispense') cls = 'calendar-badge--dispense';
-      badges += `<div class="calendar-badge ${cls}">${escapeHtml(r.staff?.name || '?')}</div>`;
+      const { bg, text } = getStaffColor(r.staff_id);
+      eventsHtml += `<span class="cal-evt" style="background:${bg};color:${text};">${escapeHtml(r.staff?.name || '?')}</span>`;
     });
-    if (dayReqs.length > 3) badges += `<div class="calendar-badge calendar-badge--more">+${dayReqs.length - 3}</div>`;
+    if (dayReqs.length > 3) {
+      eventsHtml += `<span class="cal-evt cal-evt--more">+${dayReqs.length - 3}</span>`;
+    }
 
     html += `<div class="${classes.join(' ')}" data-date="${dateStr}">
-      <div class="calendar-grid__date">${d}</div>
-      <div class="calendar-grid__badges">${badges}</div>
+      <div class="cal-date"><span class="cal-date__num${dateStr === todayStr ? ' cal-date__num--today' : ''}">${d}</span></div>
+      <div class="cal-events">${eventsHtml}</div>
     </div>`;
   }
   grid.innerHTML = html;
@@ -406,45 +444,113 @@ function renderCalendar() {
 }
 
 function showDayDetail(dateStr) {
-  const detail = document.getElementById('day-detail');
   const dayReqs = state.requests.filter(r => r.date === dateStr);
   const dt = new Date(dateStr + 'T00:00:00');
   const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
   const title = `${dt.getMonth() + 1}/${dt.getDate()}（${dayNames[dt.getDay()]}）`;
   const holiday = state.holidays[dateStr];
 
-  let html = `<div class="day-detail__title">${title}${holiday ? ` <span style="color:var(--color-danger);font-size:var(--font-size-xs)">${holiday}</span>` : ''}</div>`;
+  // 選択セルをハイライト
+  document.querySelectorAll('.calendar-grid__cell.is-selected').forEach(c => c.classList.remove('is-selected'));
+  const selectedCell = document.querySelector(`.calendar-grid__cell[data-date="${dateStr}"]`);
+  if (selectedCell) selectedCell.classList.add('is-selected');
+
+  // タイトル（祝日ラベル付き）
+  const titleEl = document.getElementById('bottom-sheet-title');
+  titleEl.textContent = title;
+  if (holiday) {
+    const badge = document.createElement('span');
+    badge.textContent = ` ${holiday}`;
+    badge.style.cssText = 'font-size:var(--font-size-xs);color:var(--color-danger);font-weight:500;';
+    titleEl.appendChild(badge);
+  }
+
+  // ボトムシートの中身
+  let bodyHtml = '';
   if (dayReqs.length === 0) {
-    html += '<p style="font-size:var(--font-size-sm);color:var(--color-text-muted);">希望なし</p>';
+    bodyHtml = '<p style="font-size:var(--font-size-sm);color:var(--color-text-muted);padding:4px 0 8px;">この日の希望はありません</p>';
   } else {
-    html += '<ul class="day-detail__list">';
+    bodyHtml = '<ul class="day-detail__list">';
     dayReqs.forEach(r => {
-      let type, cls;
+      let type, evtCls;
       switch (r.request_type) {
-        case 'off': type = '休み希望'; cls = 'calendar-badge--off'; break;
-        case 'am': type = 'AM可'; cls = 'calendar-badge--am'; break;
-        case 'pm': type = 'PM可'; cls = 'calendar-badge--pm'; break;
-        case 'dispense': type = '調剤'; cls = 'calendar-badge--dispense'; break;
-        default: type = 'その他'; cls = 'calendar-badge--other'; break;
+        case 'off':      type = '休み希望'; evtCls = 'cal-evt--off';      break;
+        case 'am':       type = 'AM可';    evtCls = 'cal-evt--am';       break;
+        case 'pm':       type = 'PM可';    evtCls = 'cal-evt--pm';       break;
+        case 'dispense': type = '調剤';    evtCls = 'cal-evt--dispense'; break;
+        default:         type = 'その他';  evtCls = 'cal-evt--other';    break;
       }
-      const note = r.note ? ` - ${escapeHtml(r.note)}` : '';
-      html += `<li class="day-detail__item"><span>${escapeHtml(r.staff?.name || '?')}${note}</span><span class="day-detail__type-badge ${cls}">${type}</span></li>`;
-
+      const note = r.note
+        ? `<span class="day-detail__note">${escapeHtml(r.note)}</span>`
+        : '';
+      bodyHtml += `<li class="day-detail__item day-detail__item--tappable" data-staff-id="${r.staff_id}" data-date="${dateStr}">
+        <span class="day-detail__name">${escapeHtml(r.staff?.name || '?')}</span>
+        <span class="cal-evt ${evtCls}" style="padding:3px 10px;border-radius:var(--radius-full);flex-shrink:0;">${type}</span>
+        <i data-lucide="chevron-right" class="day-detail__chevron"></i>
+        ${note}
+      </li>`;
     });
-    html += '</ul>';
+    bodyHtml += '</ul>';
   }
 
-  if (state.selectedStaffId) {
-    html += `<button class="btn btn--primary btn--sm" style="margin-top:12px;width:100%;" id="day-detail-add">＋ 希望を登録</button>`;
-  } else {
-    html += `<p style="font-size:var(--font-size-xs);color:var(--color-text-muted);margin-top:8px;">上部で担当を選択すると登録できます</p>`;
-  }
+  // 新規登録ボタン（常に表示、スタッフ未選択時はモーダル内で選択）
+  bodyHtml += `<button class="btn btn--primary btn--sm" style="width:100%;margin-top:14px;" id="bottom-sheet-add">
+    <i data-lucide="plus" style="width:14px;height:14px;"></i> 新規登録
+  </button>`;
 
-  detail.innerHTML = html;
-  detail.style.display = 'block';
+  document.getElementById('bottom-sheet-body').innerHTML = bodyHtml;
+  document.getElementById('bottom-sheet-overlay').classList.add('active');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 
-  const addBtn = document.getElementById('day-detail-add');
-  if (addBtn) addBtn.addEventListener('click', () => openModal(state.selectedStaffId, [dateStr]));
+  // 既存イベントタップ → 編集モーダル
+  document.querySelectorAll('.day-detail__item--tappable').forEach(item => {
+    item.addEventListener('click', () => {
+      closeBottomSheet();
+      openModal(item.dataset.staffId, [item.dataset.date]);
+    });
+  });
+
+  // 新規登録ボタン → 登録モーダル（選択中スタッフ or 先頭スタッフ）
+  document.getElementById('bottom-sheet-add').addEventListener('click', () => {
+    closeBottomSheet();
+    openModal(state.selectedStaffId || state.staffList[0]?.id, [dateStr]);
+  });
+}
+
+function closeBottomSheet() {
+  const overlay = document.getElementById('bottom-sheet-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  document.getElementById('bottom-sheet-title').textContent = '';
+  document.getElementById('bottom-sheet-body').innerHTML = '';
+  document.querySelectorAll('.calendar-grid__cell.is-selected').forEach(c => c.classList.remove('is-selected'));
+}
+
+function renderStaffChips() {
+  const container = document.getElementById('staff-chips');
+  if (!container) return;
+  container.innerHTML = state.staffList.map(s => {
+    const isActive = s.id === state.selectedStaffId;
+    const { text } = getStaffColor(s.id);
+    return `<button class="staff-chip${isActive ? ' is-active' : ''}" data-staff-id="${s.id}"><span class="staff-chip__dot" style="background:${text};"></span>${escapeHtml(s.name)}</button>`;
+  }).join('');
+  container.querySelectorAll('.staff-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      state.selectedStaffId = chip.dataset.staffId;
+      localStorage.setItem('selectedStaffId', state.selectedStaffId);
+      document.getElementById('staff-select').value = state.selectedStaffId;
+      updateDispenseVisibility(state.selectedStaffId);
+      renderStaffChips();
+      updateFabVisibility();
+    });
+  });
+}
+
+function updateFabVisibility() {
+  const fab = document.getElementById('fab-add');
+  if (!fab) return;
+  const isMobile = window.innerWidth <= 768;
+  fab.style.display = (state.selectedStaffId && isMobile) ? 'flex' : 'none';
 }
 
 // ============================================================

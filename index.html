@@ -30,8 +30,8 @@
           <option value="">選択してください</option>
         </select>
       </div>
-      <a href="generate.html" class="app-header__link"><i data-lucide="calendar-cog" style="width:16px;height:16px;"></i> シフト生成</a>
-      <a href="admin.html" class="app-header__link"><i data-lucide="settings" style="width:16px;height:16px;"></i> 管理</a>
+      <a href="generate.html" class="app-header__link"><i data-lucide="calendar-cog" style="width:16px;height:16px;"></i><span class="app-header__link-text"> シフト生成</span></a>
+      <a href="admin.html" class="app-header__link"><i data-lucide="settings" style="width:16px;height:16px;"></i><span class="app-header__link-text"> 管理</span></a>
     </nav>
   </header>
 
@@ -75,8 +75,8 @@
 
     <!-- カレンダー（スマホ） -->
     <div class="calendar-wrapper" id="calendar-wrapper">
+      <div class="staff-chips" id="staff-chips"></div>
       <div class="calendar-grid" id="calendar-grid"></div>
-      <div class="day-detail" id="day-detail" style="display:none;"></div>
     </div>
 
     <!-- その他リスト -->
@@ -133,6 +133,25 @@
       </div>
     </div>
   </div>
+
+  <!-- ボトムシート（日付詳細・スマホ） -->
+  <div class="bottom-sheet-overlay" id="bottom-sheet-overlay">
+    <div class="bottom-sheet" id="bottom-sheet">
+      <div class="bottom-sheet__handle"></div>
+      <div class="bottom-sheet__header">
+        <span class="bottom-sheet__title" id="bottom-sheet-title"></span>
+        <button class="bottom-sheet__close" id="bottom-sheet-close" aria-label="閉じる">
+          <i data-lucide="x" style="width:16px;height:16px;"></i>
+        </button>
+      </div>
+      <div class="bottom-sheet__body" id="bottom-sheet-body"></div>
+    </div>
+  </div>
+
+  <!-- FAB（スマホ用・スタッフ選択時に表示） -->
+  <button class="fab" id="fab-add" aria-label="今日の希望を登録" style="display:none;">
+    <i data-lucide="plus" style="width:24px;height:24px;"></i>
+  </button>
 
   <!-- トースト -->
   <div class="toast-container" id="toast-container"></div>
