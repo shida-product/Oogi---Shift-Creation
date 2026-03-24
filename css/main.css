@@ -6,7 +6,7 @@
 .main-container {
   max-width: 1600px;
   margin: 0 auto;
-  padding: 0 24px 40px;
+  padding: 24px 24px 40px;
 }
 
 /* ================================================================
@@ -84,7 +84,7 @@
 /* クロスハイライト（縦横軸） */
 .gantt-table td.cross-highlight,
 .gantt-table th.cross-highlight {
-  background: var(--color-surface-hover) !important;
+  background-color: #F1F5F9 !important;
 }
 
 /* ドラッグ選択中 */

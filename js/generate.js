@@ -145,6 +145,43 @@ function bindEvents() {
       editor.style.display = 'none';
     }
   });
+  setupGanttHover();
+}
+
+// ============================================================
+// ガントチャート ホバー（クロスハイライト）
+// ============================================================
+function setupGanttHover() {
+  const ganttTable = document.getElementById('gantt-table');
+  if (!ganttTable) return;
+
+  function clearCrossHighlight() {
+    ganttTable.querySelectorAll('.cross-highlight').forEach(c => c.classList.remove('cross-highlight'));
+  }
+
+  ganttTable.addEventListener('mouseover', (e) => {
+    clearCrossHighlight();
+    const cell = e.target.closest('td.day-cell');
+    if (!cell) return;
+
+    // 行のハイライト
+    const tr = cell.closest('tr');
+    if (tr) {
+      tr.querySelectorAll('td').forEach(td => td.classList.add('cross-highlight'));
+    }
+
+    // 列のハイライト
+    const dateStr = cell.dataset.date;
+    if (dateStr) {
+      ganttTable.querySelectorAll(`td.day-cell[data-date="${dateStr}"]`).forEach(td => td.classList.add('cross-highlight'));
+      const th = ganttTable.querySelector(`th[data-date="${dateStr}"]`);
+      if (th) th.classList.add('cross-highlight');
+    }
+  });
+
+  ganttTable.addEventListener('mouseleave', () => {
+    clearCrossHighlight();
+  });
 }
 
 function changeMonth(delta) {
@@ -275,41 +312,110 @@ async function handleGenerate() {
 }
 
 // ============================================================
-// スコアリング関数
+// チェック用ヘルパー関数（scoreShifts / renderConditionsCheck 共通）
 // ============================================================
-function scoreShifts(assignments, yearMonth) {
+function _staffAssignments(assignments, staffId) {
+  return assignments.filter(a => a.staff_id === staffId);
+}
+function _workDays(assignments, staffId) {
+  return _staffAssignments(assignments, staffId).filter(a => a.work_pattern && a.work_pattern !== '');
+}
+function _restDays(assignments, staffId) {
+  return _staffAssignments(assignments, staffId).filter(a => !a.work_pattern || a.work_pattern === '');
+}
+function _countPattern(assignments, staffId, pattern) {
+  return _staffAssignments(assignments, staffId).filter(a => a.work_pattern === pattern).length;
+}
+function _maxConsecutiveWork(assignments, staffId) {
+  const sorted = _staffAssignments(assignments, staffId).sort((a, b) => a.date.localeCompare(b.date));
+  let max = 0, count = 0;
+  for (const a of sorted) {
+    if (a.work_pattern && a.work_pattern !== '') { count++; max = Math.max(max, count); }
+    else { count = 0; }
+  }
+  return max;
+}
+function _maxConsecutiveWorkIncludingDispense(assignments, staffId, yearMonth, daysInMonth) {
+  const works = _workDays(assignments, staffId).map(a => a.date);
+  const dispenses = state.requests.filter(r => r.staff_id === staffId && r.request_type === 'dispense').map(r => r.date);
+  const allWorkDates = new Set([...works, ...dispenses]);
+  let max = 0, currentConsec = 0;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
+    if (allWorkDates.has(dateStr)) { currentConsec++; max = Math.max(max, currentConsec); }
+    else { currentConsec = 0; }
+  }
+  return max;
+}
+function _countSundays(assignments, staffId) {
+  return _workDays(assignments, staffId).filter(a => new Date(a.date + 'T00:00:00').getDay() === 0).length;
+}
+function _checkConsecutiveRestPairs(assignments, staffId) {
+  const rests = _restDays(assignments, staffId).map(a => a.date).sort();
+  let pairs = 0;
+  for (let i = 0; i < rests.length - 1; i++) {
+    const d1 = new Date(rests[i] + 'T00:00:00');
+    const d2 = new Date(rests[i + 1] + 'T00:00:00');
+    if ((d2 - d1) / 86400000 === 1) { pairs++; i++; }
+  }
+  return pairs;
+}
+function _restOverlap(assignments, id1, id2) {
+  const r1 = new Set(_restDays(assignments, id1).map(a => a.date));
+  const r2 = new Set(_restDays(assignments, id2).map(a => a.date));
+  let overlap = 0;
+  for (const d of r1) {
+    if (r2.has(d) && new Date(d + 'T00:00:00').getDay() !== 0) overlap++;
+  }
+  return overlap;
+}
+function _countCrossStore(assignments, staffId, mainStore) {
+  const mainPattern = mainStore === 'ebisu' ? PATTERNS.PART_EBISU : PATTERNS.PART_SHIBUYA;
+  return _workDays(assignments, staffId).filter(a => a.work_pattern !== mainPattern).length;
+}
+function _getWeeklyBreakdown(assignments, staffId) {
+  const weeks = {};
+  for (const a of _workDays(assignments, staffId)) {
+    const dt = new Date(a.date + 'T00:00:00');
+    const wk = Math.floor((dt.getDate() - 1) / 7);
+    weeks[wk] = (weeks[wk] || 0) + 1;
+  }
+  return weeks;
+}
+function _dispenseCount(staffId) {
+  return state.requests.filter(r => r.staff_id === staffId && r.request_type === 'dispense').length;
+}
+
+// ============================================================
+// 全チェック実行（共通エンジン）
+// scoreShifts と renderConditionsCheck の両方がこれを使う
+// ============================================================
+function runAllChecks(assignments, yearMonth) {
   const staffList = state.staffList.filter(s => s.is_active);
   const [year, month] = yearMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
   const daysOff = state.monthlySettings[yearMonth] || 10;
 
+  // スタッフ分類
   const murakami = staffList.find(s => s.staff_type === 'special');
   const shinoda = staffList.find(s => s.staff_type === 'employee' && s.assigned_store === 'shibuya');
   const ono = staffList.find(s => s.staff_type === 'employee' && s.assigned_store === 'ebisu');
   const tokunaga = staffList.find(s => s.staff_type === 'part_time' && s.role === 'pharmacist');
   const officeStaff = staffList.filter(s => s.staff_type === 'part_time' && s.role === 'office');
 
-  const work = (id) => assignments.filter(a => a.staff_id === id && a.work_pattern && a.work_pattern !== '');
-  const rest = (id) => assignments.filter(a => a.staff_id === id && (!a.work_pattern || a.work_pattern === ''));
+  // ショートカット
+  const work = (id) => _workDays(assignments, id);
+  const rest = (id) => _restDays(assignments, id);
 
-  let score = 100;
-  // breakdown: { category, label, delta, type }
-  const breakdown = [];
-  const addPenalty = (category, label, delta) => {
-    if (delta === 0) return;
-    score += delta;
-    breakdown.push({ category, label, delta });
-  };
+  // ===== 全体チェック =====
+  const globalItems = [];
 
-  // ---- ハード制約 ----
-
-  // H1. 店舗充足
+  // G1. 店舗充足
   let ebisuShort = 0, shibuyaShort = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
     const dow = new Date(dateStr + 'T00:00:00').getDay();
     const dayWork = assignments.filter(a => a.date === dateStr && a.work_pattern && a.work_pattern !== '');
-
     if (dow !== 0) {
       const ep = dayWork.filter(a => [PATTERNS.EMPLOYEE_EBISU, PATTERNS.PART_EBISU].includes(a.work_pattern))
         .filter(a => staffList.find(s => s.id === a.staff_id)?.role === 'pharmacist').length;
@@ -325,88 +431,166 @@ function scoreShifts(assignments, yearMonth) {
     if (sp < 1) shibuyaShort++;
     if (so < 1) shibuyaShort++;
   }
-  if (ebisuShort > 0) addPenalty('H1', `恵比寿充足不足 ${ebisuShort}件`, -100 * ebisuShort);
-  if (shibuyaShort > 0) addPenalty('H1', `渋谷充足不足 ${shibuyaShort}件`, -100 * shibuyaShort);
+  globalItems.push(
+    { id: 'G1-ebisu', tag: '絶対', status: ebisuShort === 0 ? 'pass' : 'fail', text: '恵比寿（薬1+事1）', value: ebisuShort === 0 ? '充足' : `${ebisuShort}日不足`, scoreDelta: ebisuShort > 0 ? -100 * ebisuShort : 0 },
+    { id: 'G1-shibuya', tag: '絶対', status: shibuyaShort === 0 ? 'pass' : 'fail', text: '渋谷（薬1+事1）', value: shibuyaShort === 0 ? '充足' : `${shibuyaShort}日不足`, scoreDelta: shibuyaShort > 0 ? -100 * shibuyaShort : 0 },
+  );
 
-  // H3. 連勤超過
-  for (const s of staffList) {
-    const sorted = assignments.filter(a => a.staff_id === s.id).sort((a, b) => a.date.localeCompare(b.date));
-    let consec = 0, maxConsec = 0;
-    for (const a of sorted) {
-      if (a.work_pattern && a.work_pattern !== '') { consec++; maxConsec = Math.max(maxConsec, consec); }
-      else { consec = 0; }
-    }
-    const maxLimit = s.work_conditions?.max_consecutive_days || 5;
-    if (maxConsec > maxLimit) {
-      addPenalty('H3', `${s.name}連勤超過 (${maxConsec}日連勤)`, -50 * (maxConsec - maxLimit));
-    }
+  // G2. 希望休反映
+  let violations = 0;
+  const offRequests = state.requests.filter(r => r.request_type === 'off');
+  for (const req of offRequests) {
+    const assign = assignments.find(a => a.staff_id === req.staff_id && a.date === req.date);
+    if (assign && assign.work_pattern && assign.work_pattern !== '') violations++;
   }
+  globalItems.push(
+    { id: 'G2', tag: '絶対', status: violations === 0 ? 'pass' : 'fail', text: '提出された希望休が全て反映されているか', value: violations === 0 ? '○' : `${violations}件違反`, scoreDelta: 0 },
+  );
 
-  // ---- ソフト制約 ----
+  // ===== スタッフ別チェック =====
+  const staffChecks = {}; // staffId → { name, section, items[] }
 
-  // S1. 信太↔小野の公休重複
-  if (shinoda && ono) {
-    const r1 = new Set(rest(ono.id).map(a => a.date));
-    const r2 = new Set(rest(shinoda.id).map(a => a.date));
-    let overlap = 0;
-    for (const d of r1) { if (r2.has(d) && new Date(d + 'T00:00:00').getDay() !== 0) overlap++; }
-    if (overlap > 0) addPenalty('S1', `信太↔小野公休重複 ${overlap}日`, -overlap * 30);
-  }
-
-  // S2. 小野の日曜以外連休
+  // --- 小野（恵比寿固定） ---
   if (ono) {
-    const rests = rest(ono.id).map(a => a.date).sort();
-    let badPairs = 0;
-    for (let i = 0; i < rests.length - 1; i++) {
-      const d1 = new Date(rests[i] + 'T00:00:00');
-      const d2 = new Date(rests[i + 1] + 'T00:00:00');
-      if ((d2 - d1) / 86400000 === 1 && d1.getDay() !== 0 && d2.getDay() !== 0) badPairs++;
-    }
-    if (badPairs > 0) addPenalty('S2', `小野の日曜非隣連休 ${badPairs}例`, -badPairs * 20);
-  }
-
-  // S3. 信太の3日以上連続休
-  if (shinoda) {
-    const rests = rest(shinoda.id).map(a => a.date).sort();
-    let triplets = 0;
-    for (let i = 0; i < rests.length - 2; i++) {
-      const d1 = new Date(rests[i] + 'T00:00:00');
-      const d2 = new Date(rests[i + 1] + 'T00:00:00');
-      const d3 = new Date(rests[i + 2] + 'T00:00:00');
-      if ((d2 - d1) / 86400000 === 1 && (d3 - d2) / 86400000 === 1) triplets++;
-    }
-    if (triplets > 0) addPenalty('S3', `信太の3日以上連続休 ${triplets}例`, -triplets * 20);
-  }
-
-  // S4. 事務の他店舗勤務
-  for (const s of officeStaff) {
-    const mainStore = (s.store_priority?.ebisu ?? 99) <= 2 ? PATTERNS.PART_EBISU : PATTERNS.PART_SHIBUYA;
-    const cross = work(s.id).filter(a => a.work_pattern !== mainStore).length;
-    if (cross > 0) addPenalty('S4', `${s.name}他店舗勤務 ${cross}日`, -cross * 15);
-  }
-
-  // S5. 村上の出勤
-  if (murakami) {
-    const mWork = work(murakami.id).length;
-    if (mWork > 0) addPenalty('S5', `村上出勤 ${mWork}日（積極発動回避）`, -mWork * 10);
-  }
-
-  // H6 & S6. 勤務日数
-  for (const s of [...officeStaff, ...(tokunaga ? [tokunaga] : [])]) {
-    const cond = s.work_conditions || {};
-    if (cond.target_days_per_month) {
-      const wCount = work(s.id).length;
-      if (wCount < cond.target_days_per_month) {
-        addPenalty('H6', `${s.name}目標未達 (${wCount}/${cond.target_days_per_month}日)`, -(cond.target_days_per_month - wCount) * 100);
-      } else {
-        const maxDays = cond.max_days_per_month || cond.target_days_per_month;
-        const over = wCount - maxDays;
-        if (over > 0) addPenalty('S6', `${s.name}MAX超過 (+${over}日)`, -over * 5);
+    const restCount = rest(ono.id).length;
+    const allEbisu = work(ono.id).every(a => a.work_pattern === PATTERNS.EMPLOYEE_EBISU);
+    const consec = _maxConsecutiveWork(assignments, ono.id);
+    const restDateList = rest(ono.id).map(a => a.date).sort();
+    let nonSundayPairs = 0;
+    for (let i = 0; i < restDateList.length - 1; i++) {
+      const d1 = new Date(restDateList[i] + 'T00:00:00');
+      const d2 = new Date(restDateList[i + 1] + 'T00:00:00');
+      if ((d2 - d1) / 86400000 === 1) {
+        if (d1.getDay() !== 0 && d2.getDay() !== 0) nonSundayPairs++;
+        i++;
       }
     }
+    const sundayPairs = _checkConsecutiveRestPairs(assignments, ono.id) - nonSundayPairs;
+
+    staffChecks[ono.id] = { name: ono.name, section: '薬剤師', items: [
+      { id: 'ono-store', tag: '絶対', status: allEbisu ? 'pass' : 'fail', text: '恵比寿固定', value: allEbisu ? '○' : '他店あり', scoreDelta: 0 },
+      { id: 'ono-rest', tag: '絶対', status: restCount === daysOff ? 'pass' : 'warn', text: `公休数 (${daysOff}日)`, value: `${restCount}日`, scoreDelta: 0 },
+      { id: 'ono-consec', tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連続勤務日数の上限（最大5連勤まで）', value: `${consec}日`, scoreDelta: consec > 5 ? -50 * (consec - 5) : 0 },
+      { id: 'ono-sundaypair', tag: '高', status: sundayPairs >= 1 ? 'pass' : 'warn', text: '日曜日に隣接する2連休の取得', value: `${sundayPairs}回`, scoreDelta: 0 },
+      { id: 'ono-nonsunpair', tag: '高', status: nonSundayPairs === 0 ? 'pass' : 'warn', text: '日曜日を含まない連休（発生時は要確認）', value: nonSundayPairs === 0 ? 'なし○' : `${nonSundayPairs}回`, scoreDelta: nonSundayPairs > 0 ? -nonSundayPairs * 20 : 0 },
+    ]};
   }
 
-  // S7. 勤務偏り
+  // --- 信太（渋谷固定） ---
+  if (shinoda) {
+    const restCount = rest(shinoda.id).length;
+    const devCount = _countPattern(assignments, shinoda.id, PATTERNS.DEV);
+    const allShibuya = work(shinoda.id).every(a =>
+      a.work_pattern === PATTERNS.EMPLOYEE_SHIBUYA || a.work_pattern === PATTERNS.DEV
+    );
+    const consec = _maxConsecutiveWork(assignments, shinoda.id);
+    const pairs = _checkConsecutiveRestPairs(assignments, shinoda.id);
+    const restDateList = rest(shinoda.id).map(a => a.date).sort();
+    let adjacentPairs = 0;
+    for (let i = 0; i < restDateList.length - 2; i++) {
+      const d1 = new Date(restDateList[i] + 'T00:00:00');
+      const d2 = new Date(restDateList[i + 1] + 'T00:00:00');
+      const d3 = new Date(restDateList[i + 2] + 'T00:00:00');
+      if ((d2 - d1) / 86400000 === 1 && (d3 - d2) / 86400000 === 1) adjacentPairs++;
+    }
+    const items = [
+      { id: 'shinoda-store', tag: '絶対', status: allShibuya ? 'pass' : 'fail', text: '渋谷固定', value: allShibuya ? '○' : '他店あり', scoreDelta: 0 },
+      { id: 'shinoda-rest', tag: '絶対', status: restCount === daysOff ? 'pass' : 'warn', text: `公休数 (${daysOff}日)`, value: `${restCount}日`, scoreDelta: 0 },
+      { id: 'shinoda-dev', tag: '絶対', status: devCount <= 2 ? 'pass' : 'fail', text: '開発業務の割り当て回数（最大2回まで）', value: `${devCount}回`, scoreDelta: 0 },
+      { id: 'shinoda-consec', tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連続勤務日数の上限（最大5連勤まで）', value: `${consec}日`, scoreDelta: consec > 5 ? -50 * (consec - 5) : 0 },
+      { id: 'shinoda-pairs', tag: '低', status: pairs >= 2 ? 'pass' : 'warn', text: '2連休の取得回数（シフトに余裕がある場合）', value: `${pairs}回`, scoreDelta: pairs > 0 ? pairs * 5 : 0 },
+      { id: 'shinoda-adjpair', tag: '高', status: adjacentPairs === 0 ? 'pass' : 'warn', text: '2連休同士が過度に近接していないか（ペア分散）', value: adjacentPairs === 0 ? '○' : `${adjacentPairs}箇所`, scoreDelta: adjacentPairs > 0 ? -adjacentPairs * 20 : 0 },
+    ];
+    if (ono) {
+      const overlap = _restOverlap(assignments, shinoda.id, ono.id);
+      items.push({ id: 'shinoda-overlap', tag: '高', status: overlap === 0 ? 'pass' : 'fail', text: '小野との公休被り（日曜日を除く）', value: `${overlap}日`, scoreDelta: overlap > 0 ? -overlap * 30 : 0 });
+    }
+    staffChecks[shinoda.id] = { name: shinoda.name, section: '薬剤師', items };
+  }
+
+  // --- 徳永（パート薬剤師） ---
+  if (tokunaga) {
+    const workCount = work(tokunaga.id).length;
+    const consec = _maxConsecutiveWork(assignments, tokunaga.id);
+    const consecDispense = _maxConsecutiveWorkIncludingDispense(assignments, tokunaga.id, yearMonth, daysInMonth);
+    const sundays = _countSundays(assignments, tokunaga.id);
+    let storeViolations = 0;
+    for (const a of work(tokunaga.id)) {
+      const dow = new Date(a.date + 'T00:00:00').getDay();
+      const onoRest = ono && _restDays(assignments, ono.id).some(r => r.date === a.date);
+      if (dow === 0) { if (a.work_pattern !== PATTERNS.PART_SHIBUYA) storeViolations++; }
+      else if (onoRest) { if (a.work_pattern !== PATTERNS.PART_EBISU) storeViolations++; }
+      else { if (a.work_pattern !== PATTERNS.PART_SHIBUYA) storeViolations++; }
+    }
+    staffChecks[tokunaga.id] = { name: tokunaga.name, section: '薬剤師', items: [
+      { id: 'tok-days', tag: '絶対', status: workCount >= 15 && workCount <= 22 ? 'pass' : 'fail', text: '勤務日数（基本17日/MAX22日）', value: `${workCount}日`, scoreDelta: 0 },
+      { id: 'tok-sun', tag: '絶対', status: sundays <= 2 ? 'pass' : 'fail', text: '日曜日の出勤回数（最大2回まで）', value: `${sundays}回`, scoreDelta: 0 },
+      { id: 'tok-consec', tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連続勤務日数の上限（最大5連勤まで）', value: `${consec}日`, scoreDelta: consec > 5 ? -50 * (consec - 5) : 0 },
+      { id: 'tok-disp', tag: '絶対', status: consecDispense <= 5 ? 'pass' : 'fail', text: '「調剤」の希望休を含めた連続勤務日数の上限（最大5連勤まで）', value: `${consecDispense}日`, scoreDelta: consecDispense > 5 ? -50 * (consecDispense - 5) : 0 },
+      { id: 'tok-store', tag: '絶対', status: storeViolations === 0 ? 'pass' : 'warn', text: '日曜は渋谷、それ以外は小野の出勤状況に合わせた適切な店舗への配置', value: storeViolations === 0 ? '○' : `${storeViolations}日逸脱`, scoreDelta: 0 },
+    ]};
+  }
+
+  // --- 村上（穴埋め） ---
+  if (murakami) {
+    const mWork = work(murakami.id).length;
+    staffChecks[murakami.id] = { name: murakami.name, section: '薬剤師', items: [
+      { id: 'mura-days', tag: '中', status: mWork <= 3 ? 'pass' : 'warn', text: '出勤日数（極力少なく）', value: `${mWork}日`, scoreDelta: mWork > 0 ? -mWork * 10 : 0 },
+    ]};
+  }
+
+  // --- 事務パート ---
+  for (const staff of officeStaff) {
+    const workCount = work(staff.id).length;
+    const consec = _maxConsecutiveWork(assignments, staff.id);
+    const cond = staff.work_conditions || {};
+    const mainStore = (staff.store_priority?.ebisu ?? 99) <= 2 ? 'ebisu' : 'shibuya';
+    const crossCount = _countCrossStore(assignments, staff.id, mainStore);
+    const storeName = mainStore === 'ebisu' ? '恵比寿' : '渋谷';
+    const pri = staff.store_priority || {};
+    const items = [];
+
+    // 勤務日数（調剤含む）
+    const dispCount = _dispenseCount(staff.id);
+    const totalWork = workCount + dispCount;
+    if (cond.target_days_per_month) {
+      const maxDays = cond.max_days_per_month || cond.target_days_per_month;
+      const isBelowTarget = totalWork < cond.target_days_per_month;
+      const baseStatus = isBelowTarget ? 'fail' : totalWork <= cond.target_days_per_month ? 'pass' : totalWork <= maxDays ? 'warn' : 'fail';
+      const delta = isBelowTarget ? -(cond.target_days_per_month - totalWork) * 100 : (totalWork > maxDays ? -(totalWork - maxDays) * 5 : 0);
+      items.push({ id: `${staff.id}-days`, tag: '絶対', status: baseStatus, text: `勤務日数（基本${cond.target_days_per_month}日/MAX${maxDays}日）`, value: `${totalWork}日`, scoreDelta: delta });
+    } else {
+      items.push({ id: `${staff.id}-days`, status: 'pass', text: '勤務日数', value: `${totalWork}日`, scoreDelta: 0 });
+    }
+
+    // 週2/3交互チェック
+    if (cond.alternating_weeks) {
+      const weeks = _getWeeklyBreakdown(assignments, staff.id);
+      const totalWeeks = Math.ceil(daysInMonth / 7);
+      let altOk = true;
+      const ngWeeks = [];
+      for (let w = 0; w < totalWeeks; w++) {
+        const expected = cond.alternating_weeks[w % cond.alternating_weeks.length];
+        const actual = weeks[w] || 0;
+        if (actual > expected) { altOk = false; ngWeeks.push(`W${w + 1}`); }
+      }
+      const dispValue = altOk ? '○' : `NG: ${ngWeeks.join(',')}`;
+      items.push({ id: `${staff.id}-alt`, tag: '高', status: altOk ? 'pass' : 'warn', text: `週${cond.alternating_weeks.join('/')}交互`, value: dispValue, scoreDelta: 0 });
+    }
+
+    const maxConsec = cond.max_consecutive_days || 5;
+    items.push({ id: `${staff.id}-consec`, tag: '絶対', status: consec <= maxConsec ? 'pass' : 'fail', text: `連続勤務日数の上限（最大${maxConsec}連勤まで）`, value: `${consec}日`, scoreDelta: consec > maxConsec ? -50 * (consec - maxConsec) : 0 });
+    items.push({ id: `${staff.id}-cross`, tag: '中', status: crossCount === 0 ? 'pass' : 'warn', text: `他店舗勤務（${storeName}メイン）`, value: `${crossCount}日`, scoreDelta: crossCount > 0 ? -crossCount * 15 : 0 });
+    const priText = `恵:${pri.ebisu ?? '-'} 渋:${pri.shibuya ?? '-'}`;
+    items.push({ id: `${staff.id}-pri`, status: 'pass', text: '配置優先順位', value: priText, scoreDelta: 0 });
+
+    staffChecks[staff.id] = { name: staff.name, section: '事務パート', items };
+  }
+
+  // --- 追加のスコア用チェック（UIには直接表示しないがスコアに影響） ---
+  const bonusItems = [];
+
+  // 勤務偏り（事務パート）
   for (const s of officeStaff) {
     const days = work(s.id).map(a => new Date(a.date + 'T00:00:00').getDate());
     if (days.length >= 2) {
@@ -414,18 +598,54 @@ function scoreShifts(assignments, yearMonth) {
       const variance = days.reduce((a, d) => a + (d - mean) ** 2, 0) / days.length;
       const evenness = Math.sqrt(variance);
       const idealSpread = daysInMonth / 3;
-      if (evenness < idealSpread * 0.5) addPenalty('S7', `${s.name}勤務偏り（前半/後半連町）`, -10);
+      if (evenness < idealSpread * 0.5) {
+        bonusItems.push({ id: `${s.id}-spread`, scoreDelta: -10, label: `${s.name}勤務偏り（前半/後半集中）` });
+      }
     }
   }
 
-  // ボーナス：2連休ペア（信太・小野）
-  for (const emp of [ono, shinoda].filter(Boolean)) {
-    const rests = rest(emp.id).map(a => a.date).sort();
+  // 2連休ボーナス（小野）
+  if (ono) {
+    const rests = rest(ono.id).map(a => a.date).sort();
     let pairs = 0;
     for (let i = 0; i < rests.length - 1; i++) {
       if ((new Date(rests[i + 1] + 'T00:00:00') - new Date(rests[i] + 'T00:00:00')) / 86400000 === 1) { pairs++; i++; }
     }
-    if (pairs > 0) addPenalty('BONUS', `${emp.name}連休ペア +${pairs}個`, +pairs * 5);
+    if (pairs > 0) bonusItems.push({ id: 'ono-pair-bonus', scoreDelta: pairs * 5, label: `${ono.name}連休ペア +${pairs}個` });
+  }
+
+  return { globalItems, staffChecks, bonusItems };
+}
+
+// ============================================================
+// スコアリング関数（runAllChecksの結果からスコアを算出）
+// ============================================================
+function scoreShifts(assignments, yearMonth) {
+  const { globalItems, staffChecks, bonusItems } = runAllChecks(assignments, yearMonth);
+
+  let score = 100;
+  const breakdown = [];
+  const addDelta = (category, label, delta) => {
+    if (delta === 0) return;
+    score += delta;
+    breakdown.push({ category, label, delta });
+  };
+
+  // 全体チェックのスコア反映
+  for (const item of globalItems) {
+    addDelta(item.id, item.text, item.scoreDelta);
+  }
+
+  // スタッフ別チェックのスコア反映
+  for (const [, check] of Object.entries(staffChecks)) {
+    for (const item of check.items) {
+      addDelta(item.id, `${check.name}: ${item.text}`, item.scoreDelta);
+    }
+  }
+
+  // ボーナス/ペナルティ
+  for (const item of bonusItems) {
+    addDelta(item.id, item.label, item.scoreDelta);
   }
 
   return { score: Math.round(score), breakdown };
@@ -465,7 +685,8 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
   // 各スタッフの勤務カウント追跡
   const workCounts = {}; // staff_id → { total, sundays, weekly: { weekNum: count }, consecutive }
   activeStaff.forEach(s => {
-    workCounts[s.id] = { total: 0, sundays: 0, weekly: {}, consecutiveDays: 0, lastWorkedDate: null };
+    const dispenseCount = state.requests.filter(r => r.staff_id === s.id && r.request_type === 'dispense').length;
+    workCounts[s.id] = { total: dispenseCount, sundays: 0, weekly: {}, consecutiveDays: 0, lastWorkedDate: null };
   });
 
   // 社員の公休日を事前計算
@@ -496,6 +717,11 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
     // 連勤チェック（基本は最大5連勤、DB設定があれば上書き）
     const staff = state.staffList.find(s => s.id === staffId);
     let maxConsecutive = staff?.work_conditions?.max_consecutive_days || 5;
+
+    // 週の勤務日数が固定されているパート（中村）は、連勤上限を週の最大日数に合わせることで週またぎの連勤を防止
+    if (staff?.work_conditions?.alternating_weeks) {
+      maxConsecutive = Math.min(maxConsecutive, Math.max(...staff.work_conditions.alternating_weeks));
+    }
 
     // ==== 調剤を含んだ連勤の特別チェック ====
     // 過去方向の連続勤務（Oogi実働 + 調剤）カウント
@@ -780,8 +1006,8 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
           }
           
           // ペースが正常、または遅れている（基本のレギュラー配置）
-          // 遅れている人ほどスコアが高くなり、優先度が上がる
-          return 100 - (ahead * 100) - priority;
+          // 優先度（priority）を最重要視し、同じ優先度のスタッフ間のみでペース配分を調整する
+          return 1000 - (priority * 100) - (ahead * 100);
         };
         return getScore(b) - getScore(a);
       });
@@ -958,6 +1184,25 @@ function computeRestDays(employee, dates, daysOff, requestMap, avoidDates = new 
 
     // 残りは孤立配置（連続にならないようにバラす）
     if (placed < remaining) {
+      // 安全策：6連勤以上が発生しないように、公休の間隔を補正する
+      const enforceGaps = () => {
+        let maxWorkStreak = 0;
+        let p = null;
+        for (const d of dates) {
+          if (restDays.has(d.dateStr)) { p = null; continue; }
+          if (d.dow === 0 && isEbisuEmployee) continue; 
+          p = p ? p + 1 : 1;
+          if (p >= 6 && placed < remaining) {
+            // 6連勤目があれば休みにする
+            if (!restDays.has(d.dateStr)) {
+              restDays.add(d.dateStr);
+              placed++;
+              p = null;
+            }
+          }
+        }
+      };
+      
       const singleCandidates = candidates.filter(d => {
         if (restDays.has(d)) return false;
         // 前後の日が既に公休でないか確認（孤立配置）
@@ -973,6 +1218,8 @@ function computeRestDays(employee, dates, daysOff, requestMap, avoidDates = new 
         restDays.add(pool[i]);
         placed++;
       }
+      // 最後に6連勤潰しの補正をかける
+      enforceGaps();
     }
   } else if (isShibuyaEmployee) {
     // === 信太専用ロジック ===
@@ -1631,7 +1878,7 @@ async function renderHistoryPanel() {
 }
 
 // ============================================================
-// 条件チェックパネル
+// 条件チェックパネル（runAllChecksの結果を描画するだけ）
 // ============================================================
 function renderConditionsCheck() {
   const panel = document.getElementById('conditions-panel');
@@ -1645,76 +1892,11 @@ function renderConditionsCheck() {
   panel.style.display = 'block';
   grid.innerHTML = '';
 
-  const assignments = state.assignments;
-  const staffList = state.staffList.filter(s => s.is_active);
   const yearMonth = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
-  const daysOff = state.monthlySettings[yearMonth] || 10;
-  const daysInMonth = new Date(state.currentYear, state.currentMonth + 1, 0).getDate();
+  const { globalItems, staffChecks } = runAllChecks(state.assignments, yearMonth);
 
-  // スタッフ分類
-  const murakami = staffList.find(s => s.staff_type === 'special');
-  const shinoda = staffList.find(s => s.staff_type === 'employee' && s.assigned_store === 'shibuya');
-  const ono = staffList.find(s => s.staff_type === 'employee' && s.assigned_store === 'ebisu');
-  const tokunaga = staffList.find(s => s.staff_type === 'part_time' && s.role === 'pharmacist');
-  const officeStaff = staffList.filter(s => s.staff_type === 'part_time' && s.role === 'office');
-
-  // ヘルパー
-  function staffAssignments(staffId) {
-    return assignments.filter(a => a.staff_id === staffId);
-  }
-  function workDays(staffId) {
-    return staffAssignments(staffId).filter(a => a.work_pattern && a.work_pattern !== '');
-  }
-  function restDays(staffId) {
-    return staffAssignments(staffId).filter(a => !a.work_pattern || a.work_pattern === '');
-  }
-  function countPattern(staffId, pattern) {
-    return staffAssignments(staffId).filter(a => a.work_pattern === pattern).length;
-  }
-  function maxConsecutiveWork(staffId) {
-    const sorted = staffAssignments(staffId).sort((a, b) => a.date.localeCompare(b.date));
-    let max = 0, count = 0;
-    for (const a of sorted) {
-      if (a.work_pattern && a.work_pattern !== '') { count++; max = Math.max(max, count); }
-      else { count = 0; }
-    }
-    return max;
-  }
-  function checkConsecutiveRestPairs(staffId) {
-    const rests = restDays(staffId).map(a => a.date).sort();
-    let pairs = 0;
-    for (let i = 0; i < rests.length - 1; i++) {
-      const d1 = new Date(rests[i] + 'T00:00:00');
-      const d2 = new Date(rests[i + 1] + 'T00:00:00');
-      if ((d2 - d1) / (1000 * 60 * 60 * 24) === 1) { pairs++; i++; }
-    }
-    return pairs;
-  }
-  function countSundays(staffId) {
-    return workDays(staffId).filter(a => new Date(a.date + 'T00:00:00').getDay() === 0).length;
-  }
-  function restOverlap(id1, id2) {
-    const r1 = new Set(restDays(id1).map(a => a.date));
-    const r2 = new Set(restDays(id2).map(a => a.date));
-    let overlap = 0;
-    for (const d of r1) {
-      if (r2.has(d) && new Date(d + 'T00:00:00').getDay() !== 0) overlap++;
-    }
-    return overlap;
-  }
-  function countCrossStore(staffId, mainStore) {
-    const mainPattern = mainStore === 'ebisu' ? PATTERNS.PART_EBISU : PATTERNS.PART_SHIBUYA;
-    return workDays(staffId).filter(a => a.work_pattern !== mainPattern).length;
-  }
-  function getWeeklyBreakdown(staffId) {
-    const weeks = {};
-    for (const a of workDays(staffId)) {
-      const dt = new Date(a.date + 'T00:00:00');
-      const wk = Math.floor((dt.getDate() - 1) / 7);
-      weeks[wk] = (weeks[wk] || 0) + 1;
-    }
-    return weeks;
-  }
+  // 未達成サマリー収集用
+  const summaryProblems = [];
 
   let currentSection = null;
   function createSection(icon, title) {
@@ -1731,12 +1913,13 @@ function renderConditionsCheck() {
     currentSection = sectionGrid;
   }
 
-  // 未達成サマリー収集用（全カード描画後にまとめて先頭へ挿入）
-  const summaryProblems = [];
-
-  // カード追加（currentSectionに追加）
+  // カード描画
   function appendCard(title, items) {
     const icons = { pass: '✅', fail: '❌', warn: '⚠️' };
+    // 優先順位ソート（絶対 > 高 > 中 > 低 > なし）
+    const rank = { '絶対': 1, '高': 2, '中': 3, '低': 4 };
+    items.sort((a, b) => (rank[a.tag] || 99) - (rank[b.tag] || 99));
+
     const card = document.createElement('div');
     card.className = 'staff-conditions-card';
     const titleEl = document.createElement('div');
@@ -1757,7 +1940,6 @@ function renderConditionsCheck() {
         <span class="condition-item__value">${value}</span>
       `;
       ul.appendChild(li);
-      // fail / warn をサマリーに収集
       if (status === 'fail' || status === 'warn') {
         summaryProblems.push({ staff: title, status, tag, text, value });
       }
@@ -1767,212 +1949,31 @@ function renderConditionsCheck() {
     (currentSection || grid).appendChild(card);
   }
 
+  // ===== 全体チェック（店舗充足・希望休） =====
+  appendCard('店舗充足', globalItems.filter(i => i.id.startsWith('G1')));
+  appendCard('希望休', globalItems.filter(i => i.id === 'G2'));
 
-  // ========== H1. 店舗充足チェック ==========
-  {
-    let ebisuShort = 0, shibuyaShort = 0;
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dateStr = `${yearMonth}-${String(d).padStart(2, '0')}`;
-      const dow = new Date(dateStr + 'T00:00:00').getDay();
-      const dayAssign = assignments.filter(a => a.date === dateStr && a.work_pattern && a.work_pattern !== '');
-
-      if (dow !== 0) { // 恵比寿（日曜以外）
-        const epharm = dayAssign.filter(a =>
-          a.work_pattern === PATTERNS.EMPLOYEE_EBISU || a.work_pattern === PATTERNS.PART_EBISU
-        ).filter(a => staffList.find(s => s.id === a.staff_id)?.role === 'pharmacist').length;
-        const eoffice = dayAssign.filter(a =>
-          a.work_pattern === PATTERNS.EMPLOYEE_EBISU || a.work_pattern === PATTERNS.PART_EBISU
-        ).filter(a => staffList.find(s => s.id === a.staff_id)?.role === 'office').length;
-        if (epharm < 1 || eoffice < 1) ebisuShort++;
-      }
-      // 渋谷
-      const spharm = dayAssign.filter(a =>
-        [PATTERNS.EMPLOYEE_SHIBUYA, PATTERNS.PART_SHIBUYA].includes(a.work_pattern)
-      ).filter(a => staffList.find(s => s.id === a.staff_id)?.role === 'pharmacist').length;
-      const soffice = dayAssign.filter(a =>
-        [PATTERNS.EMPLOYEE_SHIBUYA, PATTERNS.PART_SHIBUYA].includes(a.work_pattern)
-      ).filter(a => staffList.find(s => s.id === a.staff_id)?.role === 'office').length;
-      if (spharm < 1 || soffice < 1) shibuyaShort++;
+  // ===== 薬剤師セクション =====
+  const pharmStaff = Object.entries(staffChecks).filter(([, v]) => v.section === '薬剤師');
+  if (pharmStaff.length > 0) {
+    createSection('💊', '薬剤師');
+    for (const [, check] of pharmStaff) {
+      appendCard(check.name, check.items);
     }
-    appendCard('店舗充足', [
-      { tag: '絶対', status: ebisuShort === 0 ? 'pass' : 'fail', text: '恵比寿（薬1+事1）', value: ebisuShort === 0 ? '充足' : `${ebisuShort}日不足` },
-      { tag: '絶対', status: shibuyaShort === 0 ? 'pass' : 'fail', text: '渋谷（薬1+事1）', value: shibuyaShort === 0 ? '充足' : `${shibuyaShort}日不足` },
-    ]);
   }
 
-  // ========== H2. 希望休反映チェック ==========
-  {
-    let violations = 0;
-    const offRequests = state.requests.filter(r => r.request_type === 'off');
-    for (const req of offRequests) {
-      const assign = assignments.find(a => a.staff_id === req.staff_id && a.date === req.date);
-      if (assign && assign.work_pattern && assign.work_pattern !== '') violations++;
+  // ===== 事務パートセクション =====
+  const officeStaffChecks = Object.entries(staffChecks).filter(([, v]) => v.section === '事務パート');
+  if (officeStaffChecks.length > 0) {
+    createSection('📝', '事務パート');
+    for (const [, check] of officeStaffChecks) {
+      appendCard(check.name, check.items);
     }
-    appendCard('希望休', [
-      { tag: '絶対', status: violations === 0 ? 'pass' : 'fail', text: '希望休が全て反映', value: violations === 0 ? '○' : `${violations}件違反` },
-    ]);
-  }
-
-  // ==================== 薬剤師 ====================
-  createSection('💊', '薬剤師');
-
-  // ========== 小野（恵比寿固定） ==========
-  if (ono) {
-    const rest = restDays(ono.id).length;
-    const allEbisu = workDays(ono.id).every(a => a.work_pattern === PATTERNS.EMPLOYEE_EBISU);
-    const consec = maxConsecutiveWork(ono.id);
-
-    // 日曜隣接ペアチェック（土日 or 日月 のみ許可）
-    const restDateList = restDays(ono.id).map(a => a.date).sort();
-    let nonSundayPairs = 0; // 日曜に隣接しない連休
-    for (let i = 0; i < restDateList.length - 1; i++) {
-      const d1 = new Date(restDateList[i] + 'T00:00:00');
-      const d2 = new Date(restDateList[i + 1] + 'T00:00:00');
-      if ((d2 - d1) / (1000 * 60 * 60 * 24) === 1) {
-        // 連休 → どちらかが日曜ならOK、そうでなければNG
-        if (d1.getDay() !== 0 && d2.getDay() !== 0) nonSundayPairs++;
-        i++; // ペアをスキップ
-      }
-    }
-    const sundayPairs = checkConsecutiveRestPairs(ono.id) - nonSundayPairs;
-
-    appendCard(ono.name, [
-      { tag: '絶対', status: allEbisu ? 'pass' : 'fail', text: '恵比寿固定', value: allEbisu ? '○' : '他店あり' },
-      { tag: '絶対', status: rest === daysOff ? 'pass' : 'warn', text: `公休数 (${daysOff}日)`, value: `${rest}日` },
-      { tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連勤上限 (≤5)', value: `${consec}日` },
-      { tag: '高', status: sundayPairs >= 1 ? 'pass' : 'warn', text: '日曜隣接2連休', value: `${sundayPairs}回` },
-      { tag: '高', status: nonSundayPairs === 0 ? 'pass' : 'warn', text: '日曜以外の連休', value: nonSundayPairs === 0 ? 'なし○' : `${nonSundayPairs}回` },
-    ]);
-  }
-
-  // ========== 信太（渋谷固定） ==========
-  if (shinoda) {
-    const rest = restDays(shinoda.id).length;
-    const devCount = countPattern(shinoda.id, PATTERNS.DEV);
-    const allShibuya = workDays(shinoda.id).every(a =>
-      a.work_pattern === PATTERNS.EMPLOYEE_SHIBUYA || a.work_pattern === PATTERNS.DEV
-    );
-    const consec = maxConsecutiveWork(shinoda.id);
-    const pairs = checkConsecutiveRestPairs(shinoda.id);
-
-    // ペア分散チェック（ペア同士が隣接していないか）
-    const restDateList = restDays(shinoda.id).map(a => a.date).sort();
-    let adjacentPairs = 0;
-    // 3日以上連続休みがあるかチェック
-    for (let i = 0; i < restDateList.length - 2; i++) {
-      const d1 = new Date(restDateList[i] + 'T00:00:00');
-      const d2 = new Date(restDateList[i + 1] + 'T00:00:00');
-      const d3 = new Date(restDateList[i + 2] + 'T00:00:00');
-      if ((d2 - d1) / 86400000 === 1 && (d3 - d2) / 86400000 === 1) adjacentPairs++;
-    }
-
-    const items = [
-      { tag: '絶対', status: allShibuya ? 'pass' : 'fail', text: '渋谷固定', value: allShibuya ? '○' : '他店あり' },
-      { tag: '絶対', status: rest === daysOff ? 'pass' : 'warn', text: `公休数 (${daysOff}日)`, value: `${rest}日` },
-      { tag: '絶対', status: devCount <= 2 ? 'pass' : 'fail', text: '◯開発 (≤2回)', value: `${devCount}回` },
-      { tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連勤上限 (≤5)', value: `${consec}日` },
-      { tag: '低', status: pairs >= 2 ? 'pass' : 'warn', text: '2連休ペア (余裕があれば)', value: `${pairs}回` },
-      { tag: '高', status: adjacentPairs === 0 ? 'pass' : 'warn', text: 'ペア分散(隣接NG)', value: adjacentPairs === 0 ? '○' : `${adjacentPairs}箇所` },
-    ];
-    if (ono) {
-      const overlap = restOverlap(shinoda.id, ono.id);
-      items.push({ tag: '高', status: overlap === 0 ? 'pass' : 'fail', text: '↔小野 公休重複（日曜除く）', value: `${overlap}日` });
-    }
-    appendCard(shinoda.name, items);
-  }
-
-  // ========== 徳永（パート薬剤師） ==========
-  if (tokunaga) {
-    const work = workDays(tokunaga.id).length;
-    const consec = maxConsecutiveWork(tokunaga.id);
-    const sundays = countSundays(tokunaga.id);
-    const weeksInMonth = Math.ceil(daysInMonth / 7);
-
-    // 店舗選択ルールチェック
-    let storeViolations = 0;
-    for (const a of workDays(tokunaga.id)) {
-      const dateStr = a.date;
-      const dow = new Date(dateStr + 'T00:00:00').getDay();
-      const onoRest = ono && restDays(ono.id).some(r => r.date === dateStr);
-      if (dow === 0) {
-        if (a.work_pattern !== PATTERNS.PART_SHIBUYA) storeViolations++;
-      } else if (onoRest) {
-        if (a.work_pattern !== PATTERNS.PART_EBISU) storeViolations++;
-      } else {
-        if (a.work_pattern !== PATTERNS.PART_SHIBUYA) storeViolations++;
-      }
-    }
-
-    appendCard(tokunaga.name, [
-      { tag: '絶対', status: work >= 15 && work <= 22 ? 'pass' : 'fail', text: '勤務日数 (基本17/MAX22)', value: `${work}日` },
-      { tag: '絶対', status: sundays <= 2 ? 'pass' : 'fail', text: '日曜出勤 (≤2回)', value: `${sundays}回` },
-      { tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連勤上限 (≤5)', value: `${consec}日` },
-      { tag: '絶対', status: storeViolations === 0 ? 'pass' : 'warn', text: '店舗選択ルール', value: storeViolations === 0 ? '○' : `${storeViolations}日逸脱` },
-    ]);
-  }
-
-  // ========== 村上（穴埋め） ==========
-  if (murakami) {
-    const work = workDays(murakami.id).length;
-    appendCard(murakami.name, [
-      { tag: '中', status: work <= 3 ? 'pass' : 'warn', text: '出勤日数（極力少なく）', value: `${work}日` },
-    ]);
-  }
-
-  // ==================== 事務パート ====================
-  createSection('📝', '事務パート');
-
-  // ========== 事務パート ==========
-  for (const staff of officeStaff) {
-    const work = workDays(staff.id).length;
-    const consec = maxConsecutiveWork(staff.id);
-    const cond = staff.work_conditions || {};
-    const mainStore = (staff.store_priority?.ebisu ?? 99) <= 2 ? 'ebisu' : 'shibuya';
-    const crossCount = countCrossStore(staff.id, mainStore);
-    const storeName = mainStore === 'ebisu' ? '恵比寿' : '渋谷';
-    const pri = staff.store_priority || {};
-
-    const items = [];
-
-    // H6. 月勤務日数（社保クリアが最低保証）
-    if (cond.target_days_per_month) {
-      const maxDays = cond.max_days_per_month || cond.target_days_per_month;
-      const isBelowTarget = work < cond.target_days_per_month;
-      const baseStatus = isBelowTarget ? 'fail' : work <= cond.target_days_per_month ? 'pass' : work <= maxDays ? 'warn' : 'fail';
-      items.push({ tag: '絶対', status: baseStatus, text: `勤務日数 (基本${cond.target_days_per_month}/MAX${maxDays})`, value: `${work}日` });
-    } else {
-      items.push({ status: 'pass', text: '勤務日数', value: `${work}日` });
-    }
-
-    // 週2/3交互チェック（中村用）
-    if (cond.alternating_weeks) {
-      const weeks = getWeeklyBreakdown(staff.id);
-      const totalWeeks = Math.ceil(daysInMonth / 7);
-      let altOk = true;
-      const ngWeeks = [];
-      for (let w = 0; w < totalWeeks; w++) {
-        const expected = cond.alternating_weeks[w % cond.alternating_weeks.length];
-        const actual = weeks[w] || 0;
-        if (actual > expected) { altOk = false; ngWeeks.push(`W${w + 1}`); }
-      }
-      const dispValue = altOk ? '○' : `NG: ${ngWeeks.join(',')}`;
-      items.push({ tag: '高', status: altOk ? 'pass' : 'warn', text: `週${cond.alternating_weeks.join('/')}交互`, value: dispValue });
-    }
-
-    const maxConsec = cond.max_consecutive_days || 5;
-    items.push({ tag: '絶対', status: consec <= maxConsec ? 'pass' : 'fail', text: `連勤上限 (≤${maxConsec})`, value: `${consec}日` });
-    items.push({ tag: '中', status: crossCount === 0 ? 'pass' : 'warn', text: `他店舗勤務（${storeName}メイン）`, value: `${crossCount}日` });
-
-    // 配置優先順位表示
-    const priText = `恵:${pri.ebisu ?? '-'} 渋:${pri.shibuya ?? '-'}`;
-    items.push({ status: 'pass', text: '配置優先順位', value: priText });
-
-    appendCard(staff.name, items);
   }
 
   lucide.createIcons();
 
-  // ヘッダーバッジ更新（NG/警告件数）
+  // ヘッダーバッジ更新
   const badge = document.getElementById('conditions-header-badge');
   if (badge) {
     const failCount = summaryProblems.filter(p => p.status === 'fail').length;
@@ -1989,3 +1990,4 @@ function renderConditionsCheck() {
     }
   }
 }
+

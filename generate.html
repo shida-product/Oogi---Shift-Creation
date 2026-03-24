@@ -21,50 +21,51 @@
   <header class="app-header">
     <div class="app-header__title">
       <i data-lucide="calendar-cog" style="width:20px;height:20px;"></i>
-      シフト生成
+      <span class="app-title-text">シフト生成</span>
     </div>
+
+    <div class="month-nav" style="margin: 0 auto;">
+      <button class="month-nav__btn" id="prev-month" aria-label="前月" type="button"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i></button>
+      <span class="month-nav__label" id="month-label"></span>
+      <button class="month-nav__btn" id="next-month" aria-label="次月" type="button"><i data-lucide="chevron-right" style="width:18px;height:18px;"></i></button>
+    </div>
+
     <nav class="app-header__nav">
-      <a href="index.html" class="app-header__link"><i data-lucide="calendar" style="width:16px;height:16px;"></i> 希望休</a>
-      <a href="admin.html" class="app-header__link"><i data-lucide="settings" style="width:16px;height:16px;"></i> 管理</a>
+      <!-- 凡例 -->
+      <div class="legend legend--chips" id="legend" aria-label="表示の凡例">
+        <div class="legend__item"><span class="legend__dot legend__dot--employee-ebisu"></span>恵比寿</div>
+        <div class="legend__item"><span class="legend__dot legend__dot--employee-shibuya"></span>渋谷</div>
+        <div class="legend__item"><span class="legend__dot legend__dot--dev"></span>開発</div>
+        <div class="legend__item"><span class="legend__dot legend__dot--off"></span>所定休日</div>
+        <span style="border-left:1px solid var(--color-border);margin:0 4px;"></span>
+        <div class="legend__item"><span class="legend__dot legend__dot--stripe-off"></span>希望休</div>
+        <div class="legend__item"><span class="legend__dot legend__dot--stripe-am"></span>AM可</div>
+        <div class="legend__item"><span class="legend__dot legend__dot--stripe-pm"></span>PM可</div>
+        <div class="legend__item"><span class="legend__dot legend__dot--stripe-dispense"></span>調剤</div>
+      </div>
+      
+      <div class="header-divider"></div>
+
+      <!-- アクションボタン -->
+      <div class="toolbar__actions" style="display:flex; gap:8px;">
+        <button class="btn btn--primary btn--generate btn--sm" id="btn-generate" type="button" style="padding: 6px 12px;">
+          <i data-lucide="sparkles" style="width:16px;height:16px;"></i> シフト生成
+        </button>
+        <button class="btn btn--outline btn--sm" id="btn-csv" type="button" disabled style="padding: 6px 12px;">
+          <i data-lucide="download" style="width:16px;height:16px;"></i> CSV
+        </button>
+      </div>
+
+      <div class="header-divider"></div>
+
+      <a href="index.html" class="app-header__link"><i data-lucide="calendar" style="width:16px;height:16px;"></i><span class="app-header__link-text"> 希望休</span></a>
     </nav>
   </header>
 
   <main class="main-container">
-    <!-- ツールバー -->
-    <section class="toolbar-surface" aria-label="月の切り替えと操作">
-      <div class="toolbar" style="display:flex; align-items:center; justify-content:space-between; width:100%; gap:12px;">
-        <div class="month-nav">
-          <button class="month-nav__btn" id="prev-month" aria-label="前月" type="button"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i></button>
-          <span class="month-nav__label" id="month-label"></span>
-          <button class="month-nav__btn" id="next-month" aria-label="次月" type="button"><i data-lucide="chevron-right" style="width:18px;height:18px;"></i></button>
-        </div>
-        <div class="toolbar__actions" style="display:flex; gap:8px; margin-left:auto;">
-          <button class="btn btn--primary btn--generate" id="btn-generate" type="button">
-            <i data-lucide="sparkles" style="width:16px;height:16px;"></i> シフト生成
-          </button>
-          <button class="btn btn--outline" id="btn-csv" type="button" disabled>
-            <i data-lucide="download" style="width:16px;height:16px;"></i> CSV出力
-          </button>
-        </div>
-      </div>
-    </section>
-
-
-    <!-- 凡例 -->
-    <div class="legend legend--chips" id="legend" aria-label="表示の凡例" style="margin: 16px 0;">
-      <div class="legend__item"><span class="legend__dot legend__dot--employee-ebisu"></span>恵比寿</div>
-      <div class="legend__item"><span class="legend__dot legend__dot--employee-shibuya"></span>渋谷</div>
-      <div class="legend__item"><span class="legend__dot legend__dot--dev"></span>開発</div>
-      <div class="legend__item"><span class="legend__dot legend__dot--off"></span>所定休日</div>
-      <span style="border-left:1px solid var(--color-border);margin:0 4px;"></span>
-      <div class="legend__item"><span class="legend__dot legend__dot--stripe-off"></span>希望休</div>
-      <div class="legend__item"><span class="legend__dot legend__dot--stripe-am"></span>AM可</div>
-      <div class="legend__item"><span class="legend__dot legend__dot--stripe-pm"></span>PM可</div>
-      <div class="legend__item"><span class="legend__dot legend__dot--stripe-dispense"></span>調剤</div>
-    </div>
 
     <!-- ガントチャート -->
-    <div class="card-surface gantt-wrapper" id="gantt-wrapper" style="padding: 0; margin-top: 4px;">
+    <div class="card-surface gantt-wrapper" id="gantt-wrapper" style="padding: 0;">
       <div class="gantt-placeholder" id="gantt-placeholder">
         <span class="gantt-placeholder__icon-wrap" aria-hidden="true"><i data-lucide="calendar-plus" style="width:40px;height:40px;"></i></span>
         <p class="gantt-placeholder__text">月を選択して「<strong>シフト生成</strong>」を押すと、ここにカレンダーが表示されます</p>

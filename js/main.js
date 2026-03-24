@@ -148,12 +148,7 @@ function bindEvents() {
   document.getElementById('prev-month').addEventListener('click', () => changeMonth(-1));
   document.getElementById('next-month').addEventListener('click', () => changeMonth(1));
 
-  document.getElementById('staff-select').addEventListener('change', (e) => {
-    state.selectedStaffId = e.target.value;
-    localStorage.setItem('selectedStaffId', state.selectedStaffId);
-    renderStaffChips();
-    updateFabVisibility();
-  });
+
 
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('modal-overlay').addEventListener('click', (e) => {
@@ -303,7 +298,6 @@ async function loadStaffList() {
     .order('display_order');
   if (error) { console.error(error); return; }
   state.staffList = data || [];
-  renderStaffSelect();
 }
 
 async function loadRequests() {
@@ -341,22 +335,6 @@ function renderMonth() {
   document.getElementById('month-label').textContent = `${state.currentYear}年 ${state.currentMonth + 1}月`;
 }
 
-// ============================================================
-// スタッフ選択プルダウン（スマホ用ヘッダー）
-// ============================================================
-function renderStaffSelect() {
-  const select = document.getElementById('staff-select');
-  select.innerHTML = '<option value="">選択してください</option>';
-  state.staffList.forEach(s => {
-    const opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = s.name;
-    if (s.id === state.selectedStaffId) opt.selected = true;
-    select.appendChild(opt);
-  });
-  renderStaffChips();
-  updateFabVisibility();
-}
 
 // ============================================================
 // ガントチャート描画（PC）
@@ -625,14 +603,11 @@ function renderOtherList() {
 function updateDispenseVisibility(staffId) {
   const staff = state.staffList.find(s => s.id === staffId);
   const labelDispense = document.getElementById('label-dispense');
-  const legendDispense = document.getElementById('legend-dispense-item');
   if (labelDispense) {
-    if (staff && staff.name === '徳永麻衣子') {
+    if (staff && staff.name.includes('徳永')) {
       labelDispense.style.display = 'inline-flex';
-      if (legendDispense) legendDispense.style.display = 'inline-block';
     } else {
       labelDispense.style.display = 'none';
-      if (legendDispense) legendDispense.style.display = 'none';
       const radio = document.querySelector('input[name="request-type"][value="dispense"]');
       if (radio && radio.checked) {
         document.querySelector('input[name="request-type"][value="off"]').checked = true;

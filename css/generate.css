@@ -6,7 +6,7 @@
 .main-container {
   max-width: 1600px;
   margin: 0 auto;
-  padding: 0 20px 48px;
+  padding: 24px 20px 48px;
 }
 
 /* ---------- 凡例（チップ / ピル） ---------- */
@@ -202,6 +202,12 @@
   outline: 2px solid var(--color-primary);
   outline-offset: -2px;
   z-index: 1;
+}
+
+/* クロスハイライト（縦横軸） */
+.gantt-table td.cross-highlight,
+.gantt-table th.cross-highlight {
+  background-color: #F1F5F9 !important;
 }
 
 .gantt-table .day-cell.is-ebisu-closed {

@@ -17,37 +17,24 @@
   </script>
 </head>
 <body>
-  <!-- ヘッダー -->
   <header class="app-header">
     <div class="app-header__title">
       <i data-lucide="calendar" style="width:20px;height:20px;"></i>
-      シフト希望
+      <span class="app-title-text">シフト希望</span>
     </div>
-    <nav class="app-header__nav">
-      <div class="staff-selector">
-        <label for="staff-select">担当：</label>
-        <select id="staff-select">
-          <option value="">選択してください</option>
-        </select>
-      </div>
-      <a href="generate.html" class="app-header__link"><i data-lucide="calendar-cog" style="width:16px;height:16px;"></i><span class="app-header__link-text"> シフト生成</span></a>
-      <a href="admin.html" class="app-header__link"><i data-lucide="settings" style="width:16px;height:16px;"></i><span class="app-header__link-text"> 管理</span></a>
-    </nav>
-  </header>
 
-  <!-- ツールバー -->
-  <div class="main-container">
-    <div class="toolbar-surface" style="margin-bottom: 24px;">
-      <div class="month-nav">
-        <button class="month-nav__btn" id="prev-month" aria-label="前月"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i></button>
-        <span class="month-nav__label" id="month-label"></span>
-        <button class="month-nav__btn" id="next-month" aria-label="次月"><i data-lucide="chevron-right" style="width:18px;height:18px;"></i></button>
-      </div>
+    <div class="month-nav" style="margin: 0 auto;">
+      <button class="month-nav__btn" id="prev-month" aria-label="前月"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i></button>
+      <span class="month-nav__label" id="month-label"></span>
+      <button class="month-nav__btn" id="next-month" aria-label="次月"><i data-lucide="chevron-right" style="width:18px;height:18px;"></i></button>
+    </div>
+
+    <nav class="app-header__nav">
       <div class="legend--chips">
         <div class="legend__item">
           <span class="legend__dot legend__dot--off"></span>休み希望
         </div>
-        <div class="legend__item" id="legend-dispense-item" style="display:none;">
+        <div class="legend__item" id="legend-dispense-item">
           <span class="legend__dot legend__dot--dispense" style="background:#e67e22;"></span>調剤
         </div>
         <div class="legend__item">
@@ -60,7 +47,13 @@
           <span class="legend__dot legend__dot--other"></span>その他
         </div>
       </div>
-    </div>
+      <div class="header-divider"></div>
+      <a href="generate.html" class="app-header__link"><i data-lucide="calendar-cog" style="width:16px;height:16px;"></i><span class="app-header__link-text"> シフト生成</span></a>
+    </nav>
+  </header>
+
+  <!-- メインコンテナ -->
+  <div class="main-container">
 
     <!-- ガントチャート（PC） -->
     <div class="card-surface gantt-wrapper" id="gantt-wrapper" style="padding: 0; overflow-x: auto;">
