@@ -1,0 +1,156 @@
+/* ================================================================
+   管理画面スタイル
+   ================================================================ */
+
+.admin-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px 24px 60px;
+}
+
+.admin-container h2 {
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  margin-bottom: 24px;
+}
+
+/* ---------- スタッフ追加フォーム ---------- */
+.add-staff-form {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.add-staff-form > .input-field {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* ---------- スタッフリスト ---------- */
+.staff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.staff-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px;
+  background: var(--color-surface);
+  border: 1px solid rgba(0,0,0,0.04);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+.staff-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-bg);
+}
+.staff-card.is-inactive {
+  opacity: 0.45;
+}
+
+.staff-card__main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.staff-card__order {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  min-width: 20px;
+}
+
+.staff-card__name {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin-right: auto;
+}
+
+.staff-card__badge {
+  font-size: 0.65rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.staff-card__badge--role {
+  background: var(--color-primary-bg);
+  color: var(--color-primary-text);
+}
+.staff-card__badge--type {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+.staff-card__badge--store {
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+}
+
+.staff-card__conditions {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  padding-left: 28px;
+}
+
+.staff-card__status {
+  font-size: var(--font-size-xs);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.staff-card__status--active {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.staff-card__status--inactive {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.staff-card__actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* ---------- 並び替えボタン ---------- */
+.sort-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  transition: all var(--transition-fast);
+  font-size: 0.9rem;
+}
+.sort-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+.sort-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ---------- レスポンシブ ---------- */
+@media (max-width: 768px) {
+  .admin-container {
+    padding: 16px 12px 40px;
+  }
+  .add-staff-form {
+    flex-direction: column;
+  }
+  .staff-card {
+    padding: 12px 14px;
+  }
+  .staff-card__main {
+    gap: 6px;
+  }
+}

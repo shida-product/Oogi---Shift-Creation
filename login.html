@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ログイン - オオギ薬局 シフト管理</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/common.css?v=2">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <style>
+    /* 簡易ログイン専用スタイル */
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      /* bg-gradient from common.css is applied, but let's make it a bit richer */
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.05) 0%, rgba(16, 185, 129, 0.05) 100%);
+    }
+
+    .login-container {
+      width: 100%;
+      max-width: 360px;
+      padding: 40px 32px;
+      text-align: center;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: 24px;
+      box-shadow: 
+        0 4px 6px rgba(0, 0, 0, 0.02),
+        0 20px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255,255,255,1);
+      border: 1px solid rgba(255,255,255, 0.5);
+    }
+
+    .login-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 20px;
+      background: var(--color-primary-bg);
+      color: var(--color-primary);
+      border-radius: 16px;
+      box-shadow: inset 0 2px 4px rgba(255,255,255,0.5);
+    }
+
+    .login-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--color-text);
+      margin-bottom: 8px;
+      letter-spacing: -0.02em;
+    }
+
+    .login-subtitle {
+      font-size: 14px;
+      color: var(--color-text-secondary);
+      margin-bottom: 32px;
+    }
+
+    .pin-input-group {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+
+    .pin-digit {
+      width: 48px;
+      height: 56px;
+      font-size: 24px;
+      font-weight: 700;
+      text-align: center;
+      border: 2px solid var(--color-border);
+      border-radius: 12px;
+      background: var(--color-surface);
+      color: var(--color-text);
+      transition: all 0.2s ease;
+      outline: none;
+      font-family: 'Inter', sans-serif;
+    }
+
+    .pin-digit:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .pin-digit.is-error {
+      border-color: var(--color-danger);
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-4px); }
+      75% { transform: translateX(4px); }
+    }
+
+    .error-message {
+      color: var(--color-danger);
+      font-size: 13px;
+      font-weight: 500;
+      min-height: 20px;
+      margin-bottom: 16px;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .error-message.is-visible {
+      opacity: 1;
+    }
+
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      border-radius: 12px;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body class="theme-layered">
+
+  <div class="login-container">
+    <div class="login-icon">
+      <i data-lucide="lock" style="width:28px;height:28px;"></i>
+    </div>
+    <h1 class="login-title">オオギ薬局 シフト管理</h1>
+    <p class="login-subtitle">アクセス用のPINコードを入力してください</p>
+
+    <div class="pin-input-group" id="pin-group">
+      <input type="password" class="pin-digit" maxlength="1" pattern="[0-9]*" inputmode="numeric" aria-label="PIN1桁目">
+      <input type="password" class="pin-digit" maxlength="1" pattern="[0-9]*" inputmode="numeric" aria-label="PIN2桁目">
+      <input type="password" class="pin-digit" maxlength="1" pattern="[0-9]*" inputmode="numeric" aria-label="PIN3桁目">
+      <input type="password" class="pin-digit" maxlength="1" pattern="[0-9]*" inputmode="numeric" aria-label="PIN4桁目">
+    </div>
+
+    <div class="error-message" id="error-msg">PINコードが正しくありません</div>
+
+    <button class="btn btn--primary btn-login" id="btn-submit">
+      ログイン
+      <i data-lucide="arrow-right" style="width:18px;height:18px;margin-left:6px;"></i>
+    </button>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    // 既にログイン済みならトップへリダイレクト
+    if (localStorage.getItem('ogiyakkyoku_auth') === 'true') {
+      window.location.href = 'index.html';
+    }
+
+    const CORRECT_PIN = "3248";
+    const inputs = document.querySelectorAll('.pin-digit');
+    const submitBtn = document.getElementById('btn-submit');
+    const errorMsg = document.getElementById('error-msg');
+
+    // フォーカス移動などの挙動
+    inputs.forEach((input, index) => {
+      input.addEventListener('input', (e) => {
+        // 数字以外を除外
+        input.value = input.value.replace(/[^0-9]/g, '');
+        
+        if (input.value && index < inputs.length - 1) {
+          inputs[index + 1].focus();
+        }
+        clearError();
+        
+        // 全て入力されたら自動送信チェック
+        if (index === inputs.length - 1 && input.value) {
+          checkPin();
+        }
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && !input.value && index > 0) {
+          inputs[index - 1].focus();
+        }
+        if (e.key === 'Enter') {
+          checkPin();
+        }
+      });
+    });
+
+    submitBtn.addEventListener('click', checkPin);
+
+    function checkPin() {
+      const enteredPin = Array.from(inputs).map(i => i.value).join('');
+      if (enteredPin.length < 4) return;
+
+      if (enteredPin === CORRECT_PIN) {
+        // 認証成功 (簡易的にlocalStorageにフラグを立てる)
+        localStorage.setItem('ogiyakkyoku_auth', 'true');
+        // ちょっとした成功アニメーション
+        submitBtn.style.background = 'var(--color-success)';
+        submitBtn.innerHTML = '認証成功 <i data-lucide="check" style="width:18px;height:18px;margin-left:6px;"></i>';
+        lucide.createIcons();
+        
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 500);
+      } else {
+        // 認証失敗
+        showError();
+      }
+    }
+
+    function showError() {
+      errorMsg.classList.add('is-visible');
+      inputs.forEach(i => {
+        i.classList.add('is-error');
+        i.value = '';
+      });
+      setTimeout(() => {
+        inputs.forEach(i => i.classList.remove('is-error'));
+      }, 400);
+      inputs[0].focus();
+    }
+
+    function clearError() {
+      errorMsg.classList.remove('is-visible');
+      inputs.forEach(i => i.classList.remove('is-error'));
+    }
+
+    // 初期フォーカス
+    window.addEventListener('load', () => {
+      inputs[0].focus();
+    });
+  </script>
+</body>
+</html>

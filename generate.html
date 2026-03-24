@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>シフト生成 - オオギ薬局</title>
+  <meta name="description" content="オオギ薬局 シフト自動生成・調整ツール">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/common.css?v=2">
+  <link rel="stylesheet" href="css/generate.css?v=2">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script>
+    if (localStorage.getItem('ogiyakkyoku_auth') !== 'true') {
+      window.location.href = 'login.html';
+    }
+  </script>
+</head>
+<body class="theme-layered">
+  <!-- ヘッダー -->
+  <header class="app-header">
+    <div class="app-header__title">
+      <i data-lucide="calendar-cog" style="width:20px;height:20px;"></i>
+      シフト生成
+    </div>
+    <nav class="app-header__nav">
+      <a href="index.html" class="app-header__link"><i data-lucide="calendar" style="width:16px;height:16px;"></i> 希望休</a>
+      <a href="admin.html" class="app-header__link"><i data-lucide="settings" style="width:16px;height:16px;"></i> 管理</a>
+    </nav>
+  </header>
+
+  <main class="main-container">
+    <!-- ツールバー -->
+    <section class="toolbar-surface" aria-label="月の切り替えと操作">
+      <div class="toolbar" style="display:flex; align-items:center; justify-content:space-between; width:100%; gap:12px;">
+        <div class="month-nav">
+          <button class="month-nav__btn" id="prev-month" aria-label="前月" type="button"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i></button>
+          <span class="month-nav__label" id="month-label"></span>
+          <button class="month-nav__btn" id="next-month" aria-label="次月" type="button"><i data-lucide="chevron-right" style="width:18px;height:18px;"></i></button>
+        </div>
+        <div class="toolbar__actions" style="display:flex; gap:8px; margin-left:auto;">
+          <button class="btn btn--primary btn--generate" id="btn-generate" type="button">
+            <i data-lucide="sparkles" style="width:16px;height:16px;"></i> シフト生成
+          </button>
+          <button class="btn btn--outline" id="btn-csv" type="button" disabled>
+            <i data-lucide="download" style="width:16px;height:16px;"></i> CSV出力
+          </button>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- 凡例 -->
+    <div class="legend legend--chips" id="legend" aria-label="表示の凡例" style="margin: 16px 0;">
+      <div class="legend__item"><span class="legend__dot legend__dot--employee-ebisu"></span>恵比寿</div>
+      <div class="legend__item"><span class="legend__dot legend__dot--employee-shibuya"></span>渋谷</div>
+      <div class="legend__item"><span class="legend__dot legend__dot--dev"></span>開発</div>
+      <div class="legend__item"><span class="legend__dot legend__dot--off"></span>所定休日</div>
+      <span style="border-left:1px solid var(--color-border);margin:0 4px;"></span>
+      <div class="legend__item"><span class="legend__dot legend__dot--stripe-off"></span>希望休</div>
+      <div class="legend__item"><span class="legend__dot legend__dot--stripe-am"></span>AM可</div>
+      <div class="legend__item"><span class="legend__dot legend__dot--stripe-pm"></span>PM可</div>
+      <div class="legend__item"><span class="legend__dot legend__dot--stripe-dispense"></span>調剤</div>
+    </div>
+
+    <!-- ガントチャート -->
+    <div class="card-surface gantt-wrapper" id="gantt-wrapper" style="padding: 0; margin-top: 4px;">
+      <div class="gantt-placeholder" id="gantt-placeholder">
+        <span class="gantt-placeholder__icon-wrap" aria-hidden="true"><i data-lucide="calendar-plus" style="width:40px;height:40px;"></i></span>
+        <p class="gantt-placeholder__text">月を選択して「<strong>シフト生成</strong>」を押すと、ここにカレンダーが表示されます</p>
+      </div>
+      <table class="gantt-table" id="gantt-table" style="display:none;">
+        <thead id="gantt-head"></thead>
+        <tbody id="gantt-body"></tbody>
+        <tfoot id="gantt-foot"></tfoot>
+      </table>
+    </div>
+
+    <!-- 条件チェックパネル -->
+    <div class="card-surface conditions-panel" id="conditions-panel" style="display:none;" role="region" aria-labelledby="conditions-heading">
+      <div class="conditions-panel__title" id="conditions-heading">
+        <span class="conditions-panel__title-icon" aria-hidden="true"><i data-lucide="clipboard-check" style="width:18px;height:18px;"></i></span>
+        <span class="conditions-panel__title-text">条件チェック</span>
+        <span class="conditions-header-badge" id="conditions-header-badge"></span>
+      </div>
+      <div class="conditions-panel__cards" id="conditions-grid"></div>
+    </div>
+
+    <!-- セル編集ドロップダウン -->
+    <div class="cell-editor" id="cell-editor" style="display:none;">
+      <div class="cell-editor__title" id="cell-editor-title"></div>
+      <div class="cell-editor__options" id="cell-editor-options"></div>
+    </div>
+  </main>
+
+  <!-- トースト -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ホバーツールチップ -->
+  <div class="stripe-tooltip" id="stripe-tooltip" style="display:none;">
+    <div class="stripe-tooltip__type" id="stripe-tooltip-type"></div>
+    <div class="stripe-tooltip__note" id="stripe-tooltip-note"></div>
+  </div>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script type="module" src="js/generate.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

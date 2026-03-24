@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>管理 - シフト希望 - オオギ薬局</title>
+  <meta name="description" content="オオギ薬局 シフト希望管理 - スタッフ管理画面">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/common.css">
+  <link rel="stylesheet" href="css/admin.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script>
+    if (localStorage.getItem('ogiyakkyoku_auth') !== 'true') {
+      window.location.href = 'login.html';
+    }
+  </script>
+</head>
+<body>
+  <!-- ヘッダー -->
+  <header class="app-header">
+    <div class="app-header__title">
+      <i data-lucide="settings" style="width:20px;height:20px;"></i>
+      スタッフ管理
+    </div>
+    <nav class="app-header__nav">
+      <a href="index.html" class="app-header__link"><i data-lucide="calendar" style="width:16px;height:16px;"></i> 希望休</a>
+      <a href="generate.html" class="app-header__link"><i data-lucide="calendar-cog" style="width:16px;height:16px;"></i> シフト生成</a>
+    </nav>
+  </header>
+
+  <div class="admin-container">
+    <h2>スタッフ一覧</h2>
+
+    <!-- スタッフ追加フォーム -->
+    <form class="add-staff-form card-surface" id="add-staff-form" style="padding: 16px; margin-bottom: 24px;">
+      <input type="text" id="new-staff-name" class="input-field" placeholder="スタッフ名" required>
+      <select id="new-staff-role" class="input-field">
+        <option value="office">事務</option>
+        <option value="pharmacist">薬剤師</option>
+      </select>
+      <select id="new-staff-type" class="input-field">
+        <option value="part_time">パート</option>
+        <option value="employee">社員</option>
+        <option value="special">特別枠</option>
+      </select>
+      <select id="new-staff-store" class="input-field">
+        <option value="both">両方</option>
+        <option value="ebisu">恵比寿</option>
+        <option value="shibuya">渋谷</option>
+      </select>
+      <button type="submit" class="btn btn--primary" style="white-space: nowrap;"><i data-lucide="plus" style="width:14px;height:14px;"></i> 追加</button>
+    </form>
+
+    <!-- スタッフリスト -->
+    <div class="staff-list" id="staff-list">
+      <!-- JSで動的に生成 -->
+    </div>
+
+    <!-- 月別公休数設定 -->
+    <div style="margin-top:48px;padding-top:24px;border-top:1px solid var(--color-border);">
+      <h2 style="font-size:var(--font-size-base);margin-bottom:12px;"><i data-lucide="calendar-days" style="width:16px;height:16px;"></i> 月別公休数（社員）</h2>
+      <div id="monthly-settings" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;"></div>
+    </div>
+
+
+  </div>
+
+  <!-- スタッフ編集モーダル -->
+  <div class="modal-overlay" id="edit-modal-overlay">
+    <div class="modal">
+      <h3 class="modal__title" id="edit-modal-title">スタッフ編集</h3>
+      <div class="modal__field">
+        <span class="modal__label">名前</span>
+        <input type="text" id="edit-name" class="input-field">
+      </div>
+      <div class="modal__field">
+        <span class="modal__label">職種</span>
+        <select id="edit-role" class="input-field">
+          <option value="office">事務</option>
+          <option value="pharmacist">薬剤師</option>
+        </select>
+      </div>
+      <div class="modal__field">
+        <span class="modal__label">区分</span>
+        <select id="edit-staff-type" class="input-field">
+          <option value="part_time">パート</option>
+          <option value="employee">社員</option>
+          <option value="special">特別枠</option>
+        </select>
+      </div>
+      <div class="modal__field">
+        <span class="modal__label">配属</span>
+        <select id="edit-store" class="input-field">
+          <option value="both">両方</option>
+          <option value="ebisu">恵比寿</option>
+          <option value="shibuya">渋谷</option>
+        </select>
+      </div>
+      <div class="modal__field" id="edit-conditions-area">
+        <span class="modal__label">勤務条件</span>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <label style="font-size:var(--font-size-sm);display:flex;align-items:center;gap:8px;">
+            週の最低出勤日数
+            <input type="number" id="edit-min-days" min="0" max="7" class="input-field" style="width:70px;padding:6px 10px;">
+          </label>
+          <label style="font-size:var(--font-size-sm);display:flex;align-items:center;gap:8px;">
+            月の出勤回数
+            <input type="number" id="edit-target-month" min="0" max="31" class="input-field" style="width:70px;padding:6px 10px;">
+          </label>
+          <label style="font-size:var(--font-size-sm);display:flex;align-items:center;gap:8px;">
+            日曜出勤上限（月）
+            <input type="number" id="edit-max-sunday" min="0" max="5" class="input-field" style="width:70px;padding:6px 10px;">
+          </label>
+        </div>
+      </div>
+      <div class="modal__field" id="edit-priority-area">
+        <span class="modal__label">店舗優先順位（数字が小さいほど優先）</span>
+        <div style="display:flex;gap:16px;">
+          <label style="font-size:var(--font-size-sm);display:flex;align-items:center;gap:6px;">
+            恵比寿
+            <input type="number" id="edit-priority-ebisu" min="0" max="10" class="input-field" style="width:60px;padding:6px 10px;">
+          </label>
+          <label style="font-size:var(--font-size-sm);display:flex;align-items:center;gap:6px;">
+            渋谷
+            <input type="number" id="edit-priority-shibuya" min="0" max="10" class="input-field" style="width:60px;padding:6px 10px;">
+          </label>
+        </div>
+      </div>
+      <div class="modal__actions">
+        <button class="btn btn--outline" id="edit-cancel">キャンセル</button>
+        <button class="btn btn--primary" id="edit-save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- トースト -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script type="module" src="js/admin.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

@@ -1,0 +1,453 @@
+/* ================================================================
+   メイン画面 - ガントチャート & カレンダー
+   ================================================================ */
+
+/* ---------- メインレイアウト ---------- */
+.main-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px 40px;
+}
+
+/* ================================================================
+   ガントチャート（PC表示）
+   ================================================================ */
+.gantt-wrapper {
+  background: var(--color-surface);
+}
+
+.gantt-table {
+  border-collapse: collapse;
+  min-width: 100%;
+}
+
+.gantt-table th,
+.gantt-table td {
+  border: 1px solid var(--color-border);
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ヘッダー（日付行） */
+.gantt-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-surface-2);
+  padding: 8px 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.gantt-table thead th.is-today {
+  color: var(--color-primary-text);
+  background: var(--color-primary-bg);
+}
+.gantt-table thead th.is-sunday {
+  color: var(--color-danger);
+}
+.gantt-table thead th.is-saturday {
+  color: #5ba3f5;
+}
+
+/* スタッフ名列（左固定・内容フィット） */
+.gantt-table .staff-name {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: var(--color-surface-2);
+  padding: 8px 10px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+  width: 1%; /* 内容量ギリギリの幅にする */
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* セル */
+.gantt-table td.day-cell {
+  min-width: 40px; /* 最小幅を維持、画面が広い場合は均等に伸びる */
+  height: 50px; /* クリックしやすい高さ */
+  padding: 4px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  position: relative;
+}
+.gantt-table td.day-cell:hover {
+  background: var(--color-surface-hover);
+}
+
+/* クロスハイライト（縦横軸） */
+.gantt-table td.cross-highlight,
+.gantt-table th.cross-highlight {
+  background: var(--color-surface-hover) !important;
+}
+
+/* ドラッグ選択中 */
+.gantt-table.is-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.gantt-table td.day-cell.drag-highlight {
+  background: var(--color-primary-bg);
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+/* 希望マーカー（モダンなバッジ型） */
+.gantt-table td.day-cell .marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;  /* 固定サイズ */
+  height: 32px;
+  margin: 0 auto; /* 中央揃え */
+  border-radius: 6px; /* 角丸バッジ */
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  transition: transform 0.1s;
+}
+.gantt-table td.day-cell:hover .marker {
+  transform: scale(1.05); /* ホバー時のマイクロインタラクション */
+}
+.marker--off {
+  background: var(--color-off-bg);
+  color: var(--color-off);
+}
+.marker--am {
+  background: var(--color-am-bg);
+  color: var(--color-am);
+}
+.marker--pm {
+  background: var(--color-pm-bg);
+  color: var(--color-pm);
+}
+.marker--other {
+  background: var(--color-other-bg);
+  color: var(--color-other);
+}
+.marker--dispense {
+  background: #fef0e0;
+  color: #e67e22;
+}
+
+/* 集計行 */
+.gantt-table tfoot td {
+  background: var(--color-surface-2);
+  padding: 6px 4px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.radio-dot--other { background: #b2bec3; }
+.radio-dot--dispense { background: #e67e22; }
+
+.gantt-table tfoot .count-badge {
+  display: inline-block;
+  min-width: 20px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: var(--font-size-xs);
+}
+.count-badge--warn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
+/* 凡例ドット */
+.legend__dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.legend__dot--off { background: #ff7675; }
+.legend__dot--am { background: #74b9ff; }
+.legend__dot--pm { background: #a29bfe; }
+.legend__dot--other { background: #b2bec3; }
+.legend__dot--dispense { background: #e67e22; }
+
+/* ================================================================
+   カレンダー（スマホ表示）
+   ================================================================ */
+.calendar-wrapper {
+  display: none; /* PCでは非表示 */
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  background: var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.calendar-grid__header {
+  background: var(--color-surface-2);
+  padding: 8px 0;
+  text-align: center;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.calendar-grid__header.is-sunday { color: var(--color-danger); }
+.calendar-grid__header.is-saturday { color: #5ba3f5; }
+
+.calendar-grid__cell {
+  background: var(--color-surface);
+  min-height: 70px;
+  padding: 4px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.calendar-grid__cell:hover {
+  background: var(--color-surface-hover);
+}
+.calendar-grid__cell.is-empty {
+  background: var(--color-bg);
+  cursor: default;
+}
+.calendar-grid__cell.is-today {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+
+.calendar-grid__date {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  margin-bottom: 2px;
+  color: var(--color-text-secondary);
+}
+.calendar-grid__cell.is-sunday .calendar-grid__date { color: var(--color-danger); }
+.calendar-grid__cell.is-saturday .calendar-grid__date { color: #5ba3f5; }
+
+.calendar-grid__badges {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.calendar-badge {
+  font-size: 0.6rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.calendar-badge--off {
+  background: var(--color-off-bg);
+  color: var(--color-off);
+}
+.calendar-badge--am {
+  background: var(--color-am-bg);
+  color: var(--color-am);
+}
+.calendar-badge--pm {
+  background: var(--color-pm-bg);
+  color: var(--color-pm);
+}
+.calendar-badge--other {
+  background: var(--color-other-bg);
+  color: var(--color-other);
+}
+.calendar-badge--more {
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* ---------- 日付詳細パネル（スマホ、日付タップ時） ---------- */
+.day-detail {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.day-detail__title {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.day-detail__list {
+  list-style: none;
+}
+
+.day-detail__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+.day-detail__item:last-child {
+  border-bottom: none;
+}
+
+.day-detail__type-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+}
+
+/* ================================================================
+   その他リスト（画面下部）
+   ================================================================ */
+.other-list {
+  margin-top: 24px;
+}
+
+.other-list__title {
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.other-list__count {
+  font-size: var(--font-size-xs);
+  background: var(--color-other-bg);
+  color: var(--color-other);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+}
+
+.other-list__items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.other-list__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid rgba(0,0,0,0.05);
+  border-left: 4px solid var(--color-other);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition-fast);
+}
+.other-list__item:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-bg);
+}
+
+.other-list__date {
+  font-weight: 700;
+  min-width: 80px;
+  color: var(--color-text-secondary);
+}
+
+.other-list__staff {
+  font-weight: 700;
+  min-width: 60px;
+}
+
+.other-list__note {
+  flex: 1;
+  color: var(--color-text-secondary);
+}
+
+.other-list__empty {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  padding: 24px 0;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+/* ================================================================
+   変更通知（画面下部）
+   ================================================================ */
+.changes-list {
+  margin-top: 24px;
+}
+
+.changes-list__title {
+  font-size: var(--font-size-base);
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+
+.changes-list__items {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.changes-list__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.changes-list__time {
+  min-width: 90px;
+  color: var(--color-text-muted);
+}
+
+.changes-list__action {
+  flex: 1;
+}
+
+/* ================================================================
+   祝日表示
+   ================================================================ */
+.gantt-table thead th.is-holiday {
+  color: var(--color-danger);
+}
+.gantt-table thead th.is-holiday::after {
+  content: '祝';
+  display: block;
+  font-size: 0.5rem;
+  color: var(--color-danger);
+  line-height: 1;
+}
+.calendar-grid__cell.is-holiday .calendar-grid__date {
+  color: var(--color-danger);
+}
+
+/* ================================================================
+   レスポンシブ
+   ================================================================ */
+@media (max-width: 768px) {
+  .main-container {
+    padding: 0 12px 24px;
+  }
+  .gantt-wrapper {
+    display: none; /* スマホではガント非表示 */
+  }
+  .calendar-wrapper {
+    display: block; /* スマホでカレンダー表示 */
+  }
+  .toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
