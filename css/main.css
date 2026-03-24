@@ -173,26 +173,61 @@
 .legend__dot--dispense { background: #e67e22; }
 
 /* ================================================================
-   カレンダー（スマホ表示）
+   カレンダー（スマホ表示）- Google Calendar 風
    ================================================================ */
 .calendar-wrapper {
   display: none; /* PCでは非表示 */
 }
 
+/* スタッフチップ（モバイル用横スクロール選択） */
+.staff-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 14px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.staff-chips::-webkit-scrollbar { display: none; }
+
+.staff-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 16px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--color-surface);
+  border: 1.5px solid var(--color-border);
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.staff-chip.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+/* カレンダーグリッド */
 .calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 1px;
   background: var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
+  border: 1px solid var(--color-border);
 }
 
 .calendar-grid__header {
   background: var(--color-surface-2);
   padding: 8px 0;
   text-align: center;
-  font-size: var(--font-size-xs);
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--color-text-secondary);
 }
@@ -201,8 +236,8 @@
 
 .calendar-grid__cell {
   background: var(--color-surface);
-  min-height: 70px;
-  padding: 4px;
+  min-height: 80px;
+  padding: 5px 3px 4px;
   cursor: pointer;
   transition: background var(--transition-fast);
 }
@@ -213,71 +248,161 @@
   background: var(--color-bg);
   cursor: default;
 }
-.calendar-grid__cell.is-today {
-  outline: 2px solid var(--color-primary);
-  outline-offset: -2px;
+.calendar-grid__cell.is-selected {
+  background: var(--color-primary-bg);
 }
 
-.calendar-grid__date {
-  font-size: var(--font-size-xs);
+/* 日付番号（Google Calendar スタイル：今日は青丸） */
+.cal-date {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+.cal-date__num {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
   font-weight: 600;
-  margin-bottom: 2px;
+  border-radius: 50%;
   color: var(--color-text-secondary);
+  line-height: 1;
 }
-.calendar-grid__cell.is-sunday .calendar-grid__date { color: var(--color-danger); }
-.calendar-grid__cell.is-saturday .calendar-grid__date { color: #5ba3f5; }
+.cal-date__num--today {
+  background: var(--color-primary);
+  color: #fff;
+}
+.calendar-grid__cell.is-sunday  .cal-date__num:not(.cal-date__num--today) { color: var(--color-danger); }
+.calendar-grid__cell.is-saturday .cal-date__num:not(.cal-date__num--today) { color: #5ba3f5; }
+.calendar-grid__cell.is-holiday  .cal-date__num:not(.cal-date__num--today) { color: var(--color-danger); }
 
-.calendar-grid__badges {
+/* イベント表示（コンパクト色ラベル） */
+.cal-events {
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
-
-.calendar-badge {
-  font-size: 0.6rem;
-  padding: 1px 4px;
-  border-radius: 3px;
+.cal-evt {
+  display: block;
+  font-size: 0.58rem;
+  font-weight: 700;
+  padding: 1px 3px;
+  border-radius: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.5;
 }
-.calendar-badge--off {
-  background: var(--color-off-bg);
-  color: var(--color-off);
-}
-.calendar-badge--am {
-  background: var(--color-am-bg);
-  color: var(--color-am);
-}
-.calendar-badge--pm {
-  background: var(--color-pm-bg);
-  color: var(--color-pm);
-}
-.calendar-badge--other {
-  background: var(--color-other-bg);
-  color: var(--color-other);
-}
-.calendar-badge--more {
-  background: var(--color-surface-2);
-  color: var(--color-text-muted);
-  text-align: center;
-}
+.cal-evt--off      { background: var(--color-off-bg);    color: var(--color-off);   }
+.cal-evt--am       { background: var(--color-am-bg);     color: var(--color-am);    }
+.cal-evt--pm       { background: var(--color-pm-bg);     color: var(--color-pm);    }
+.cal-evt--other    { background: var(--color-other-bg);  color: var(--color-other); }
+.cal-evt--dispense { background: #fef0e0;                color: #e67e22;            }
+.cal-evt--more     { background: var(--color-surface-2); color: var(--color-text-muted); text-align: center; }
 
-/* ---------- 日付詳細パネル（スマホ、日付タップ時） ---------- */
-.day-detail {
+/* ================================================================
+   ボトムシート（日付詳細・スマホ）
+   ================================================================ */
+.bottom-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  visibility: hidden;
+  transition: all var(--transition-normal);
+}
+.bottom-sheet-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+.bottom-sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 16px;
-  margin-top: 12px;
+  border-radius: 20px 20px 0 0;
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 20px);
+  transform: translateY(100%);
+  transition: transform var(--transition-normal);
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
 }
-
-.day-detail__title {
+.bottom-sheet-overlay.active .bottom-sheet {
+  transform: translateY(0);
+}
+.bottom-sheet__handle {
+  width: 36px;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: var(--radius-full);
+  margin: 12px auto 0;
+  flex-shrink: 0;
+}
+.bottom-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px 12px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.bottom-sheet__title {
   font-size: var(--font-size-base);
   font-weight: 700;
-  margin-bottom: 12px;
+}
+.bottom-sheet__close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+.bottom-sheet__close:hover {
+  background: var(--color-surface-hover);
+}
+.bottom-sheet__body {
+  padding: 16px 20px 4px;
+  overflow-y: auto;
+  flex: 1;
 }
 
+/* FABボタン（スマホ用フローティングアクション） */
+.fab {
+  position: fixed;
+  bottom: 28px;
+  right: 20px;
+  z-index: 120;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-primary) 0%, #4338ca 100%);
+  color: #fff;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.45);
+  transition: all var(--transition-fast);
+}
+.fab:hover {
+  transform: scale(1.07);
+  box-shadow: var(--shadow-glow);
+}
+.fab:active {
+  transform: scale(0.95);
+}
+
+/* ---------- 日付詳細リスト（ボトムシート内） ---------- */
 .day-detail__list {
   list-style: none;
 }
@@ -438,7 +563,7 @@
    ================================================================ */
 @media (max-width: 768px) {
   .main-container {
-    padding: 0 12px 24px;
+    padding: 0 12px 100px; /* FAB分の余白を確保 */
   }
   .gantt-wrapper {
     display: none; /* スマホではガント非表示 */
@@ -450,4 +575,16 @@
     flex-direction: column;
     align-items: stretch;
   }
+  /* 凡例を横スクロール */
+  .legend--chips {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .legend--chips::-webkit-scrollbar { display: none; }
+  /* スタッフ選択ドロップダウンはチップUIに置き換え */
+  .staff-selector { display: none; }
+  /* ヘッダーナビはアイコンのみ（テキスト非表示） */
+  .app-header__link-text { display: none; }
+  .app-header__link { padding: 8px 10px; }
 }
