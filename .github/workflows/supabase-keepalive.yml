@@ -1,0 +1,24 @@
+name: Supabase Keep Alive (自動停止防止)
+
+on:
+  # 定期実行：毎週月曜と木曜の午前9時(JST) = UTCで午前0時
+  schedule:
+    - cron: '0 0 * * 1,4'
+  # 手動実行用：GitHubの画面から「Run workflow」ボタンでいつでも手動テスト可能に
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase API
+        run: |
+          URL="https://eypkizmvbmnqbnzeceqs.supabase.co/rest/v1/staff?select=id&limit=1"
+          ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5cGtpem12Ym1ucWJuemVjZXFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyOTMwMDEsImV4cCI6MjA4ODg2OTAwMX0.v6hfl3PPgwo46vwn1YJmfe772T_LDHYL1riOx9HOcq0"
+          
+          echo "Sending keep-alive request to Supabase..."
+          curl -s -X GET "$URL" \
+            -H "apikey: $ANON_KEY" \
+            -H "Authorization: Bearer $ANON_KEY" > /dev/null
+          
+          echo "Keep-alive ping successful!"
