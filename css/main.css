@@ -111,8 +111,33 @@
   font-weight: 600;
   transition: transform 0.1s;
 }
-.gantt-table td.day-cell:hover .marker {
-  transform: scale(1.05); /* ホバー時のマイクロインタラクション */
+.gantt-table td.day-cell:hover .marker:not(.is-bar-start):not(.is-bar-middle):not(.is-bar-end) {
+  transform: scale(1.05); /* ホバー時のマイクロインタラクション（単発のみ） */
+}
+
+/* 複数日バー表示用スタイル（PC） */
+.gantt-table td.day-cell .marker.is-bar-start {
+  width: calc(100% + 5px);
+  margin-right: -5px;
+  border-radius: 6px 0 0 6px;
+  position: relative;
+  z-index: 2;
+}
+.gantt-table td.day-cell .marker.is-bar-middle {
+  width: calc(100% + 10px);
+  margin: 0 -5px;
+  border-radius: 0;
+  position: relative;
+  z-index: 2;
+  color: transparent;
+}
+.gantt-table td.day-cell .marker.is-bar-end {
+  width: calc(100% + 5px);
+  margin-left: -5px;
+  border-radius: 0 6px 6px 0;
+  position: relative;
+  z-index: 2;
+  color: transparent;
 }
 .marker--off {
   background: var(--color-off-bg);
@@ -308,6 +333,31 @@
 .cal-evt--other    { background: var(--color-other-bg);  color: var(--color-other); }
 .cal-evt--dispense { background: #fef0e0;                color: #e67e22;            }
 .cal-evt--more     { background: var(--color-surface-2); color: var(--color-text-muted); text-align: center; }
+
+/* 複数日バー表示用スタイル（スマホ） */
+.calendar-grid__cell .cal-evt.is-bar-start {
+  width: calc(100% + 4px);
+  margin-right: -4px;
+  border-radius: 2px 0 0 2px;
+  position: relative;
+  z-index: 2;
+}
+.calendar-grid__cell .cal-evt.is-bar-middle {
+  width: calc(100% + 8px);
+  margin: 0 -4px;
+  border-radius: 0;
+  position: relative;
+  z-index: 2;
+  color: transparent !important;
+}
+.calendar-grid__cell .cal-evt.is-bar-end {
+  width: calc(100% + 4px);
+  margin-left: -4px;
+  border-radius: 0 2px 2px 0;
+  position: relative;
+  z-index: 2;
+  color: transparent !important;
+}
 
 /* ================================================================
    ボトムシート（日付詳細・スマホ）

@@ -164,6 +164,8 @@ function handleRedo() {
 async function handleReset() {
   if (!state.baselineAssignments) return;
   state.assignments = cloneAssignments(state.baselineAssignments);
+  // 手動変更フラグもクリア（赤バッジ除去）
+  state.assignments.forEach(a => a.is_manual_override = false);
   // 履歴をクリアして初期状態に戻す
   state.history = [cloneAssignments(state.assignments)];
   state.historyIndex = 0;
@@ -353,25 +355,13 @@ async function handleGenerate() {
       }
     }
 
-    // 既存のDB保存済みシフトと比較し、良い方を採用（悪化防止）
-    let existingScore = -Infinity;
-    if (state.assignments && state.assignments.length > 0) {
-      const existing = scoreShifts(state.assignments, yearMonth);
-      existingScore = existing.score;
-    }
-
-    if (bestScore >= existingScore) {
-      // 新しい結果の方が良い（または同等）→ 上書き保存
-      state.assignments = bestAssignments;
-      state.warnings = bestWarnings;
-      state.lastScore = bestScore;
-      state.lastBreakdown = bestBreakdown;
-      await saveAssignments(yearMonth, bestAssignments);
-      console.log(`シフト生成完了 スコア: ${bestScore}（既存: ${existingScore}）→ 更新`, bestBreakdown);
-    } else {
-      // 既存の方が良い → DB上書きせず既存を維持
-      console.log(`シフト生成完了 スコア: ${bestScore}（既存: ${existingScore}）→ 既存維持`);
-    }
+    // 常に新規生成結果を採用（気に入らなければundo/resetで戻せる）
+    state.assignments = bestAssignments;
+    state.warnings = bestWarnings;
+    state.lastScore = bestScore;
+    state.lastBreakdown = bestBreakdown;
+    await saveAssignments(yearMonth, bestAssignments);
+    console.log(`シフト生成完了 スコア: ${bestScore}`, bestBreakdown);
 
     state.hasGenerated = true;
     document.getElementById('btn-csv').disabled = false;

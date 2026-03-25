@@ -84,7 +84,14 @@
         <span class="modal__label">スタッフ</span>
         <select id="modal-staff-select" class="input-field"></select>
       </div>
-      <div class="modal__field" id="modal-dates-info" style="font-size:var(--font-size-sm);color:var(--color-text-secondary);"></div>
+      <div class="modal__field" id="modal-dates-field">
+        <span class="modal__label">対象日</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <input type="date" id="modal-date-start" class="input-field" style="padding: 6px; font-family: inherit;">
+          <span>〜</span>
+          <input type="date" id="modal-date-end" class="input-field" style="padding: 6px; font-family: inherit;">
+        </div>
+      </div>
       <div class="modal__field">
         <span class="modal__label">種類</span>
         <div class="modal__radio-group">

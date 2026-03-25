@@ -236,8 +236,16 @@ function setupGanttDrag() {
     clearHighlight();
     if (dragCells.length === 0) return;
 
-    const dates = dragCells.map(c => c.dataset.date);
+    let dates = dragCells.map(c => c.dataset.date);
     const staffId = dragStaffId;
+    
+    // 単回クリック時に、クリック要素がロングバーの一部の場合、同じグループ全体を選択する
+    if (dragCells.length === 1) {
+      const marker = dragCells[0].querySelector('.marker');
+      if (marker) {
+        dates = getGroupDates(staffId, dates[0]);
+      }
+    }
     
     // 初期化
     dragCells = [];
@@ -367,9 +375,51 @@ function renderGantt() {
   let bodyHtml = '';
   state.staffList.forEach(staff => {
     bodyHtml += `<tr><td class="staff-name">${escapeHtml(staff.name)}</td>`;
+    // 1ヶ月分の予定を配列化して連続判定を行いやすくする
+    const staffReqs = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const req = state.requests.find(r => r.staff_id === staff.id && r.date === dateStr);
+      staffReqs.push({
+        dateStr,
+        req: state.requests.find(r => r.staff_id === staff.id && r.date === dateStr)
+      });
+    }
+
+    let currentGroupId = null;
+    let currentType = null;
+    let currentNote = null;
+
+    for (let d = 0; d < daysInMonth; d++) {
+      const { dateStr, req } = staffReqs[d];
+      let isBarStart = false, isBarMiddle = false, isBarEnd = false;
+      let groupId = null;
+
+      if (req) {
+        if (currentType === req.request_type && currentNote === req.note) {
+          // 前日と同じリクエストが継続
+        } else {
+          // 新しいグループの開始
+          currentGroupId = req.id || dateStr;
+          currentType = req.request_type;
+          currentNote = req.note;
+        }
+        groupId = currentGroupId;
+
+        // 前後の予定を取得して連続性を判定
+        const nextReq = staffReqs[d + 1]?.req;
+        const hasNext = nextReq && nextReq.request_type === currentType && nextReq.note === currentNote;
+        const prevReq = staffReqs[d - 1]?.req;
+        const hasPrev = prevReq && prevReq.request_type === currentType && prevReq.note === currentNote;
+
+        if (!hasPrev && hasNext) isBarStart = true;
+        if (hasPrev && hasNext) isBarMiddle = true;
+        if (hasPrev && !hasNext) isBarEnd = true;
+      } else {
+        currentGroupId = null;
+        currentType = null;
+        currentNote = null;
+      }
+
       let cell = '';
       if (req) {
         let cls, label;
@@ -380,7 +430,14 @@ function renderGantt() {
           case 'dispense': cls = 'marker--dispense'; label = '調'; break;
           default: cls = 'marker--other'; label = '他'; break;
         }
-        cell = `<div class="marker ${cls}" title="${escapeHtml(req.note || '')}">${label}</div>`;
+        
+        // ロングバー用のクラスとデータ属性
+        let extraCls = '';
+        if (isBarStart) extraCls = ' is-bar-start';
+        else if (isBarMiddle) extraCls = ' is-bar-middle';
+        else if (isBarEnd) extraCls = ' is-bar-end';
+
+        cell = `<div class="marker ${cls}${extraCls}" data-group-id="${groupId}" title="${escapeHtml(req.note || '')}">${label}</div>`;
       }
       bodyHtml += `<td class="day-cell" data-staff="${staff.id}" data-date="${dateStr}">${cell}</td>`;
     }
@@ -433,7 +490,28 @@ function renderCalendar() {
       else if (r.request_type === 'dispense') typeLabel = ' 調剤';
       else if (r.request_type === 'other') typeLabel = ' その他';
 
-      eventsHtml += `<span class="cal-evt" style="background:${bg};color:${text};">${escapeHtml(lastName + typeLabel)}</span>`;
+      let isBarStart = false, isBarMiddle = false, isBarEnd = false;
+      const prevDateObj = new Date(dt); prevDateObj.setDate(prevDateObj.getDate() - 1);
+      const prevDateStr = formatDate(prevDateObj);
+      const nextDateObj = new Date(dt); nextDateObj.setDate(nextDateObj.getDate() + 1);
+      const nextDateStr = formatDate(nextDateObj);
+
+      const prevReq = state.requests.find(pr => pr.staff_id === r.staff_id && pr.date === prevDateStr);
+      const nextReq = state.requests.find(nr => nr.staff_id === r.staff_id && nr.date === nextDateStr);
+
+      const hasPrev = prevReq && prevReq.request_type === r.request_type && prevReq.note === r.note;
+      const hasNext = nextReq && nextReq.request_type === r.request_type && nextReq.note === r.note;
+
+      if (!hasPrev && hasNext) isBarStart = true;
+      if (hasPrev && hasNext) isBarMiddle = true;
+      if (hasPrev && !hasNext) isBarEnd = true;
+
+      let extraCls = '';
+      if (isBarStart) extraCls = ' is-bar-start';
+      else if (isBarMiddle) extraCls = ' is-bar-middle';
+      else if (isBarEnd) extraCls = ' is-bar-end';
+
+      eventsHtml += `<span class="cal-evt${extraCls}" style="background:${bg};color:${text};">${escapeHtml(lastName + typeLabel)}</span>`;
     });
 
     html += `<div class="${classes.join(' ')}" data-date="${dateStr}">
@@ -507,11 +585,12 @@ function showDayDetail(dateStr) {
   document.getElementById('bottom-sheet-overlay').classList.add('active');
   if (typeof lucide !== 'undefined') lucide.createIcons();
 
-  // 既存イベントタップ → 編集モーダル
+  // 既存イベントタップ → 編集モーダル（グループ全体を渡す）
   document.querySelectorAll('.day-detail__item--tappable').forEach(item => {
     item.addEventListener('click', () => {
       closeBottomSheet();
-      openModal(item.dataset.staffId, [item.dataset.date]);
+      const groupDates = getGroupDates(item.dataset.staffId, item.dataset.date);
+      openModal(item.dataset.staffId, groupDates);
     });
   });
 
@@ -600,10 +679,11 @@ function renderOtherList() {
   container.innerHTML = html;
   if (typeof lucide !== 'undefined') lucide.createIcons();
 
-  // 各アイテムクリックで編集モーダルを開く
+  // 各アイテムクリックで編集モーダルを開く（グループ全体を渡す）
   container.querySelectorAll('.other-list__item--clickable').forEach(item => {
     item.addEventListener('click', () => {
-      openModal(item.dataset.staffId, [item.dataset.date]);
+      const groupDates = getGroupDates(item.dataset.staffId, item.dataset.date);
+      openModal(item.dataset.staffId, groupDates);
     });
   });
 }
@@ -661,23 +741,21 @@ function openModal(staffId, dates) {
       `${first.getMonth() + 1}/${first.getDate()} 〜 ${last.getMonth() + 1}/${last.getDate()}（${dates.length}日間）`;
   }
 
-  const datesInfo = document.getElementById('modal-dates-info');
-  if (dates.length > 1) {
-    datesInfo.textContent = '対象: ' + dates.map(d => {
-      const dt = new Date(d + 'T00:00:00');
-      return `${dt.getDate()}日`;
-    }).join(', ');
-    datesInfo.style.display = 'block';
-  } else {
-    datesInfo.style.display = 'none';
-  }
+  // 日付の初期値をセット
+  const startDate = dates[0];
+  const endDate = dates[dates.length - 1];
+  const startInput = document.getElementById('modal-date-start');
+  const endInput = document.getElementById('modal-date-end');
+  startInput.value = startDate;
+  endInput.value = endDate;
 
-  const existing = dates.length === 1
-    ? state.requests.find(r => r.staff_id === staffId && r.date === dates[0])
-    : null;
+  // 複数日でも先頭日付に既存データがあれば編集モード
+  const existing = state.requests.find(r => r.staff_id === staffId && r.date === dates[0]);
   state.editingRequest = existing || null;
 
   if (existing) {
+    startInput.disabled = false;
+    endInput.disabled = false;
     document.querySelector(`input[name="request-type"][value="${existing.request_type}"]`).checked = true;
     document.getElementById('modal-note').value = existing.note || '';
     document.getElementById('modal-delete').style.display = 'inline-flex';
@@ -693,6 +771,8 @@ function openModal(staffId, dates) {
     }
     document.getElementById('modal-history').style.display = 'block';
   } else {
+    startInput.disabled = false;
+    endInput.disabled = false;
     document.querySelector('input[name="request-type"][value="off"]').checked = true;
     document.getElementById('modal-note').value = '';
     document.getElementById('modal-delete').style.display = 'none';
@@ -719,21 +799,50 @@ async function handleModalSave() {
     return;
   }
 
-  if (state.editingRequest) {
-    const { error } = await supabase
-      .from('shift_requests')
-      .update({ staff_id: staffId, request_type: type, note: note || null, updated_at: new Date().toISOString() })
-      .eq('id', state.editingRequest.id);
-    if (error) { console.error(error); alert('保存に失敗: ' + error.message); return; }
-  } else {
-    const newDates = state.editingDates.filter(d =>
-      !state.requests.find(r => r.staff_id === staffId && r.date === d)
-    );
-    if (newDates.length === 0) {
-      alert('選択した日付はすべて登録済みです');
-      return;
+  const startStr = document.getElementById('modal-date-start').value;
+  const endStr = document.getElementById('modal-date-end').value;
+  
+  if (!startStr || !endStr) {
+    alert('対象日を選択してください');
+    return;
+  }
+  if (startStr > endStr) {
+    alert('終了日は開始日以降の日付を選択してください');
+    return;
+  }
+
+  const targetDates = [];
+  const currDt = new Date(startStr + 'T00:00:00');
+  const endDt = new Date(endStr + 'T00:00:00');
+  
+  while (currDt <= endDt) {
+    targetDates.push(formatDate(currDt));
+    currDt.setDate(currDt.getDate() + 1);
+  }
+
+  const toUpdate = [];
+  const toInsert = [];
+
+  for (const d of targetDates) {
+    const existingReq = state.requests.find(r => r.staff_id === staffId && r.date === d);
+    if (existingReq) {
+      toUpdate.push(existingReq);
+    } else {
+      toInsert.push(d);
     }
-    const rows = newDates.map(d => ({
+  }
+
+  // UPDATE処理（既存レコードがある日は上書き）
+  for (const req of toUpdate) {
+    const { error } = await supabase.from('shift_requests')
+      .update({ request_type: type, note: note || null, updated_at: new Date().toISOString() })
+      .eq('id', req.id);
+    if (error) { console.error(error); alert('更新に失敗: ' + error.message); return; }
+  }
+
+  // INSERT処理（無い日は新規追加）
+  if (toInsert.length > 0) {
+    const rows = toInsert.map(d => ({
       staff_id: staffId, date: d, request_type: type,
       note: note || null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }));
@@ -747,13 +856,63 @@ async function handleModalSave() {
 
 async function handleModalDelete() {
   if (!state.editingRequest) return;
-  if (!confirm('この希望を削除しますか？')) return;
 
-  const { error } = await supabase.from('shift_requests').delete().eq('id', state.editingRequest.id);
+  const staffId = document.getElementById('modal-staff-select').value;
+  const startStr = document.getElementById('modal-date-start').value;
+  const endStr = document.getElementById('modal-date-end').value;
+
+  // 対象日付の配列を生成
+  const deleteDates = [];
+  const cur = new Date(startStr + 'T00:00:00');
+  const end = new Date(endStr + 'T00:00:00');
+  while (cur <= end) { deleteDates.push(formatDate(cur)); cur.setDate(cur.getDate() + 1); }
+
+  const deleteIds = state.requests
+    .filter(r => r.staff_id === staffId && deleteDates.includes(r.date))
+    .map(r => r.id);
+
+  if (deleteIds.length === 0) return;
+
+  const label = deleteDates.length === 1 ? 'この希望を削除しますか？' : `${deleteDates.length}日分の希望をまとめて削除しますか？`;
+  if (!confirm(label)) return;
+
+  const { error } = await supabase.from('shift_requests').delete().in('id', deleteIds);
   if (error) { console.error(error); alert('削除に失敗'); return; }
 
   closeModal();
   await loadRequests();
+}
+
+// ============================================================
+// グループ日付抽出ヘルパー
+// 指定スタッフ・日付から同一条件（種類＋備考）で連続する日付の配列を返す
+// ============================================================
+function getGroupDates(staffId, dateStr) {
+  const anchor = state.requests.find(r => r.staff_id === staffId && r.date === dateStr);
+  if (!anchor) return [dateStr];
+
+  const dates = [dateStr];
+  // 前方に探索
+  let d = new Date(dateStr + 'T00:00:00');
+  while (true) {
+    d.setDate(d.getDate() - 1);
+    const ds = formatDate(d);
+    const r = state.requests.find(r => r.staff_id === staffId && r.date === ds);
+    if (r && r.request_type === anchor.request_type && r.note === anchor.note) {
+      dates.unshift(ds);
+    } else break;
+  }
+  // 後方に探索
+  d = new Date(dateStr + 'T00:00:00');
+  while (true) {
+    d.setDate(d.getDate() + 1);
+    const ds = formatDate(d);
+    const r = state.requests.find(r => r.staff_id === staffId && r.date === ds);
+    if (r && r.request_type === anchor.request_type && r.note === anchor.note) {
+      dates.push(ds);
+    } else break;
+  }
+  return dates;
 }
 
 function getLastDayOfMonth(year, month) {
