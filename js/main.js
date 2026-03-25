@@ -476,7 +476,9 @@ function renderCalendar() {
     if (dow === 6) classes.push('is-saturday');
     if (isHoliday) classes.push('is-holiday');
 
-    const dayReqs = state.requests.filter(r => r.date === dateStr);
+    const dayReqs = state.requests
+      .filter(r => r.date === dateStr)
+      .sort((a, b) => getGroupDates(b.staff_id, b.date).length - getGroupDates(a.staff_id, a.date).length);
     let eventsHtml = '';
     dayReqs.forEach(r => {
       const { bg, text } = getStaffColor(r.staff_id);
