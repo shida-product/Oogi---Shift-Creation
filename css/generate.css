@@ -188,6 +188,24 @@
   background: var(--color-surface-2);
 }
 
+/* 集計列 */
+.gantt-summary-col {
+  min-width: 36px;
+  max-width: 48px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+  white-space: nowrap;
+  background: var(--color-surface);
+  border-right: 2px solid var(--color-border) !important;
+}
+.gantt-table thead .gantt-summary-col {
+  background: var(--color-surface-2);
+}
+.gantt-table tfoot .gantt-summary-col {
+  background: var(--color-surface-2);
+}
+
 /* セル */
 .gantt-table .day-cell {
   min-width: 40px;
@@ -204,9 +222,9 @@
   z-index: 1;
 }
 
-/* クロスハイライト（縦横軸） */
-.gantt-table td.cross-highlight,
-.gantt-table th.cross-highlight {
+/* クロスハイライト（縦横軸）※集計欄・スタッフ名は除外 */
+.gantt-table td.cross-highlight:not(.gantt-summary-col):not(.staff-name),
+.gantt-table th.cross-highlight:not(.gantt-summary-col):not(.staff-name) {
   background-color: #F1F5F9 !important;
 }
 
@@ -786,4 +804,34 @@ tr.is-group-divider td {
 }
 .stripe-tooltip__note:empty {
   display: none;
+}
+
+/* ---------- Undo/Redo/Reset ボタン ---------- */
+#btn-undo,
+#btn-redo,
+#btn-reset {
+  transition: all 0.15s ease;
+}
+
+#btn-undo:not(:disabled),
+#btn-redo:not(:disabled),
+#btn-reset:not(:disabled) {
+  color: var(--color-primary, #6c5ce7);
+  border-color: var(--color-primary, #6c5ce7);
+}
+
+#btn-undo:not(:disabled):hover,
+#btn-redo:not(:disabled):hover,
+#btn-reset:not(:disabled):hover {
+  background: var(--color-primary-bg, rgba(108, 92, 231, 0.1));
+  transform: scale(1.05);
+}
+
+#btn-undo:disabled,
+#btn-redo:disabled,
+#btn-reset:disabled,
+#btn-csv:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
 }

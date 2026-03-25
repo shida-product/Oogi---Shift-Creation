@@ -119,7 +119,69 @@ const state = {
   holidays: {},
   warnings: [],
   hasGenerated: false,
+  // Undo/Redo/Reset用
+  baselineAssignments: null,  // 生成直後のスナップショット（リセット先）
+  history: [],                // [snapshot, snapshot, ...]
+  historyIndex: -1,           // 現在のhistory位置
 };
+
+const HISTORY_MAX = 50; // 履歴の最大件数
+
+// ディープコピー（assignments配列用）
+function cloneAssignments(assignments) {
+  return assignments.map(a => ({ ...a }));
+}
+
+// 履歴にpush（手動変更時に呼ぶ）
+function pushHistory() {
+  // 現在位置より先の履歴を切り捨て（redoスタックをクリア）
+  state.history = state.history.slice(0, state.historyIndex + 1);
+  state.history.push(cloneAssignments(state.assignments));
+  if (state.history.length > HISTORY_MAX) state.history.shift();
+  state.historyIndex = state.history.length - 1;
+  updateUndoRedoButtons();
+}
+
+// 履歴からassignmentsを復元してUI更新
+async function restoreFromHistory(index) {
+  state.historyIndex = index;
+  state.assignments = cloneAssignments(state.history[index]);
+  const yearMonth = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+  await saveAssignments(yearMonth, state.assignments);
+  renderGantt();
+  renderConditionsCheck();
+  updateUndoRedoButtons();
+}
+
+function handleUndo() {
+  if (state.historyIndex > 0) restoreFromHistory(state.historyIndex - 1);
+}
+
+function handleRedo() {
+  if (state.historyIndex < state.history.length - 1) restoreFromHistory(state.historyIndex + 1);
+}
+
+async function handleReset() {
+  if (!state.baselineAssignments) return;
+  state.assignments = cloneAssignments(state.baselineAssignments);
+  // 履歴をクリアして初期状態に戻す
+  state.history = [cloneAssignments(state.assignments)];
+  state.historyIndex = 0;
+  const yearMonth = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+  await saveAssignments(yearMonth, state.assignments);
+  renderGantt();
+  renderConditionsCheck();
+  updateUndoRedoButtons();
+}
+
+function updateUndoRedoButtons() {
+  const undoBtn = document.getElementById('btn-undo');
+  const redoBtn = document.getElementById('btn-redo');
+  const resetBtn = document.getElementById('btn-reset');
+  if (undoBtn) undoBtn.disabled = state.historyIndex <= 0;
+  if (redoBtn) redoBtn.disabled = state.historyIndex >= state.history.length - 1;
+  if (resetBtn) resetBtn.disabled = !state.baselineAssignments;
+}
 
 // ============================================================
 // 初期化
@@ -138,6 +200,9 @@ function bindEvents() {
   document.getElementById('next-month').addEventListener('click', () => changeMonth(1));
   document.getElementById('btn-generate').addEventListener('click', handleGenerate);
   document.getElementById('btn-csv').addEventListener('click', handleCSVExport);
+  document.getElementById('btn-undo').addEventListener('click', handleUndo);
+  document.getElementById('btn-redo').addEventListener('click', handleRedo);
+  document.getElementById('btn-reset').addEventListener('click', handleReset);
   // セルエディタの外クリックで閉じる
   document.addEventListener('click', (e) => {
     const editor = document.getElementById('cell-editor');
@@ -268,8 +333,8 @@ async function handleGenerate() {
     const yearMonth = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
     state.requests = await loadRequests(yearMonth);
 
-    // スコアリング生成：複数回試行して最高スコアを採用（手動変更は毎回リセット）
-    const TRIAL_COUNT = 8;
+    // スコアリング生成：複数回試行して最高スコアを採用
+    const TRIAL_COUNT = 30;
     let bestAssignments = null;
     let bestScore = -Infinity;
     let bestBreakdown = [];
@@ -288,19 +353,36 @@ async function handleGenerate() {
       }
     }
 
-    state.assignments = bestAssignments;
-    state.warnings = bestWarnings;
-    state.lastScore = bestScore;
-    state.lastBreakdown = bestBreakdown;
+    // 既存のDB保存済みシフトと比較し、良い方を採用（悪化防止）
+    let existingScore = -Infinity;
+    if (state.assignments && state.assignments.length > 0) {
+      const existing = scoreShifts(state.assignments, yearMonth);
+      existingScore = existing.score;
+    }
 
-    // DB保存
-    await saveAssignments(yearMonth, bestAssignments);
+    if (bestScore >= existingScore) {
+      // 新しい結果の方が良い（または同等）→ 上書き保存
+      state.assignments = bestAssignments;
+      state.warnings = bestWarnings;
+      state.lastScore = bestScore;
+      state.lastBreakdown = bestBreakdown;
+      await saveAssignments(yearMonth, bestAssignments);
+      console.log(`シフト生成完了 スコア: ${bestScore}（既存: ${existingScore}）→ 更新`, bestBreakdown);
+    } else {
+      // 既存の方が良い → DB上書きせず既存を維持
+      console.log(`シフト生成完了 スコア: ${bestScore}（既存: ${existingScore}）→ 既存維持`);
+    }
 
     state.hasGenerated = true;
     document.getElementById('btn-csv').disabled = false;
     renderGantt();
     renderConditionsCheck();
-    showToast(`シフト生成完了（スコア: ${bestScore}）`, 'success');
+
+    // baseline保存 + 履歴初期化
+    state.baselineAssignments = cloneAssignments(state.assignments);
+    state.history = [cloneAssignments(state.assignments)];
+    state.historyIndex = 0;
+    updateUndoRedoButtons();
   } catch (err) {
     console.error(err);
     showToast('生成エラー: ' + err.message, 'error');
@@ -1323,7 +1405,7 @@ function renderGantt() {
 
   // ヘッダー
   const thead = document.getElementById('gantt-head');
-  let headHtml = '<tr><th class="staff-name">スタッフ</th>';
+  let headHtml = '<tr><th class="staff-name">スタッフ</th><th class="gantt-summary-col">集計</th>';
   for (let d = 1; d <= daysInMonth; d++) {
     const dt = new Date(state.currentYear, state.currentMonth, d);
     const dow = dt.getDay();
@@ -1347,6 +1429,11 @@ function renderGantt() {
   // display_order 順で表示
   const sortedStaff = [...state.staffList].filter(s => s.is_active).sort((a, b) => a.display_order - b.display_order);
 
+  // 集計欄の色分け用定数
+  const ym = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+  const daysOff = state.monthlySettings[ym] || 10;
+
+
   // 薬剤師グループの最終インデックスを検出（roleがpharmacistの最後の行）
   let lastPharmacistIdx = -1;
   sortedStaff.forEach((s, i) => {
@@ -1358,6 +1445,48 @@ function renderGantt() {
     // 薬剤師グループの最終行に境界線クラスを付与
     const trClass = (idx === lastPharmacistIdx) ? ' class="is-group-divider"' : '';
     bodyHtml += `<tr${trClass}><td class="staff-name">${escapeHtml(staff.name)}</td>`;
+    // スタッフ名の右横に集計列
+    const staffAssigns = state.assignments.filter(a => a.staff_id === staff.id);
+    const workCount = staffAssigns.filter(a => a.work_pattern && a.work_pattern !== '').length;
+    const restCount = staffAssigns.filter(a => !a.work_pattern || a.work_pattern === '').length;
+    const sn = staff.name;
+
+    // 表示値：信太・小野は公休数、その他は出勤数
+    let summaryLabel;
+    if (sn.includes('信太') || sn.includes('小野')) {
+      summaryLabel = `休${restCount}`;
+    } else if (staff.staff_type === 'external') {
+      summaryLabel = '-';
+    } else {
+      summaryLabel = `${workCount}日`;
+    }
+
+    // 色分け：スタッフ別の集計値閾値で判定
+    let cellColor = ''; // '' = 変更なし, 'warn' = 黄色, 'ng' = 赤
+
+    if (sn.includes('村上') || sn.includes('本庄')) {
+      // 村上・本庄：常に変更なし
+      cellColor = '';
+    } else if (sn.includes('小野') || sn.includes('信太')) {
+      // 小野・信太：公休数が設定値と一致しなければ赤
+      if (restCount !== daysOff) cellColor = 'ng';
+    } else if (sn.includes('徳永') || sn.includes('木庭')) {
+      // 徳永・木庭：≤17白, 18-22黄, ≥23赤
+      if (workCount >= 23) cellColor = 'ng';
+      else if (workCount >= 18) cellColor = 'warn';
+    } else if (sn.includes('中村')) {
+      // 中村：≤10白, ≥11赤
+      if (workCount >= 11) cellColor = 'ng';
+    } else if (sn.includes('諫早')) {
+      // 諫早：≤13白, 14-17黄, ≥18赤
+      if (workCount >= 18) cellColor = 'ng';
+      else if (workCount >= 14) cellColor = 'warn';
+    }
+
+    let ngStyle = '';
+    if (cellColor === 'ng') ngStyle = 'background:#fee2e2;color:#dc2626;';
+    else if (cellColor === 'warn') ngStyle = 'background:#fef9c3;color:#a16207;';
+    bodyHtml += `<td class="gantt-summary-col" style="text-align:center;font-weight:700;font-size:0.75rem;${ngStyle}">${summaryLabel}</td>`;
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const dt = new Date(state.currentYear, state.currentMonth, d);
@@ -1509,6 +1638,11 @@ function renderGanttFooter(daysInMonth, sortedStaff) {
     shibuyaRow += `<td class="${sCellNg.trim()}">${spStr}/${soStr}</td>`;
   }
 
+  const eSummary = '<td class="gantt-summary-col"></td>';
+  const sSummary = '<td class="gantt-summary-col"></td>';
+  // staff-nameの直後に集計列の空セルを挿入
+  ebisuRow = ebisuRow.replace(/(<td class="staff-name"[^>]*>[^<]*<\/td>)/, '$1' + eSummary);
+  shibuyaRow = shibuyaRow.replace(/(<td class="staff-name"[^>]*>[^<]*<\/td>)/, '$1' + sSummary);
   tfoot.innerHTML = `<tr>${ebisuRow}</tr><tr>${shibuyaRow}</tr>`;
 }
 
@@ -1629,6 +1763,7 @@ function openCellEditor(cell, staff, dateStr) {
       state.lastBreakdown = newBreakdown;
       renderGantt();
       renderConditionsCheck();
+      pushHistory();
     });
   });
 }

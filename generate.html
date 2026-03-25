@@ -47,10 +47,21 @@
       <div class="header-divider"></div>
 
       <!-- アクションボタン -->
-      <div class="toolbar__actions" style="display:flex; gap:8px;">
+      <div class="toolbar__actions" style="display:flex; gap:8px; align-items:center;">
         <button class="btn btn--primary btn--generate btn--sm" id="btn-generate" type="button" style="padding: 6px 12px;">
           <i data-lucide="sparkles" style="width:16px;height:16px;"></i> シフト生成
         </button>
+        <span style="border-left:1px solid var(--color-border);height:24px;"></span>
+        <button class="btn btn--outline btn--sm" id="btn-reset" type="button" disabled title="生成直後の状態に戻す" style="padding:6px 8px;">
+          <i data-lucide="rotate-ccw" style="width:14px;height:14px;"></i>
+        </button>
+        <button class="btn btn--outline btn--sm" id="btn-undo" type="button" disabled title="元に戻す (Undo)" style="padding:6px 8px;">
+          <i data-lucide="undo-2" style="width:14px;height:14px;"></i>
+        </button>
+        <button class="btn btn--outline btn--sm" id="btn-redo" type="button" disabled title="やり直し (Redo)" style="padding:6px 8px;">
+          <i data-lucide="redo-2" style="width:14px;height:14px;"></i>
+        </button>
+        <span style="border-left:1px solid var(--color-border);height:24px;"></span>
         <button class="btn btn--outline btn--sm" id="btn-csv" type="button" disabled style="padding: 6px 12px;">
           <i data-lucide="download" style="width:16px;height:16px;"></i> CSV
         </button>
