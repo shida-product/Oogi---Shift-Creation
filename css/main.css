@@ -512,6 +512,28 @@
   border-color: var(--color-primary-bg);
 }
 
+/* クリック可能な条件付きアイテム */
+.other-list__item--clickable {
+  cursor: pointer;
+}
+.other-list__item--clickable:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* 編集アイコン（ホバー時にフェードイン） */
+.other-list__edit-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.other-list__item--clickable:hover .other-list__edit-icon {
+  opacity: 1;
+}
+
 .other-list__date {
   font-weight: 700;
   min-width: 80px;

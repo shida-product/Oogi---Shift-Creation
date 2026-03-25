@@ -117,7 +117,7 @@ INSERT INTO staff (employee_no, name, display_order, role, staff_type, assigned_
 
 -- スタッフ（事務）
 INSERT INTO staff (employee_no, name, display_order, role, staff_type, assigned_store, work_conditions, store_priority) VALUES
-  ('12', '木庭弥生',   5, 'office', 'part_time', 'both', '{"target_days_per_month": 17, "max_days_per_month": 22}', '{"ebisu": 1, "shibuya": 4}'),
+  ('12', '木庭弥生',   5, 'office', 'part_time', 'both', '{"target_days_per_month": 17, "max_days_per_month": 22, "max_consecutive_days": 4}', '{"ebisu": 1, "shibuya": 4}'),
   ('11', '中村かな子', 6, 'office', 'part_time', 'both', '{"target_days_per_month": 10, "max_days_per_month": 10, "alternating_weeks": [2, 3], "max_consecutive_days": 4}', '{"ebisu": 2, "shibuya": 3}'),
   ('14', '諫早千佳',   7, 'office', 'part_time', 'both', '{"target_days_per_month": 13, "max_days_per_month": 17, "max_consecutive_days": 4}', '{"ebisu": 3, "shibuya": 1}'),
   ('13', '本庄里帆',   8, 'office', 'part_time', 'both', '{"max_consecutive_days": 3}', '{"ebisu": 4, "shibuya": 2}');

@@ -578,7 +578,8 @@ function renderOtherList() {
   otherReqs.forEach(r => {
     const dt = new Date(r.date + 'T00:00:00');
     const dateLabel = `${dt.getMonth() + 1}/${dt.getDate()}（${dayNames[dt.getDay()]}）`;
-    const staffName = r.staff?.name || '不明';
+    const fullName = r.staff?.name || '不明';
+    const lastName = fullName.split(/[\s　]+/)[0];
     
     let typeLabel;
     if (r.request_type === 'am') typeLabel = 'AM可';
@@ -586,15 +587,25 @@ function renderOtherList() {
     else if (r.request_type === 'dispense') typeLabel = '調剤';
     else typeLabel = 'その他';
 
-    html += `<div class="other-list__item">
+    const noteHtml = r.note ? `<span class="other-list__note">${escapeHtml(r.note)}</span>` : '';
+
+    html += `<div class="other-list__item other-list__item--clickable" data-staff-id="${r.staff_id}" data-date="${r.date}">
       <span class="other-list__date">${dateLabel}</span>
-      <span class="other-list__staff">${escapeHtml(staffName)}</span>
-      <span class="other-list__type" style="font-size:0.75rem;font-weight:600;min-width:60px;">${typeLabel}</span>
-      <span class="other-list__note">${escapeHtml(r.note || '')}</span>
+      <span class="other-list__staff">${escapeHtml(lastName)} ${typeLabel}</span>
+      ${noteHtml}
+      <i data-lucide="pencil" class="other-list__edit-icon"></i>
     </div>`;
   });
   html += '</div>';
   container.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  // 各アイテムクリックで編集モーダルを開く
+  container.querySelectorAll('.other-list__item--clickable').forEach(item => {
+    item.addEventListener('click', () => {
+      openModal(item.dataset.staffId, [item.dataset.date]);
+    });
+  });
 }
 
 // ============================================================

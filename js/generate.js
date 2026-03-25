@@ -295,7 +295,7 @@ async function loadRequests(yearMonth) {
 
 async function loadExistingAssignments() {
   const yearMonth = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
-  
+
   // 描画のための希望休データを先にロード
   state.requests = await loadRequests(yearMonth);
 
@@ -526,7 +526,7 @@ function runAllChecks(assignments, yearMonth) {
     if (assign && assign.work_pattern && assign.work_pattern !== '') violations++;
   }
   globalItems.push(
-    { id: 'G2', tag: '絶対', status: violations === 0 ? 'pass' : 'fail', text: '提出された希望休が全て反映されているか', value: violations === 0 ? '○' : `${violations}件違反`, scoreDelta: 0 },
+    { id: 'G2', tag: '絶対', status: violations === 0 ? 'pass' : 'fail', text: '希望休が全て反映されている', value: violations === 0 ? '○' : `${violations}件違反`, scoreDelta: 0 },
   );
 
   // ===== スタッフ別チェック =====
@@ -549,13 +549,15 @@ function runAllChecks(assignments, yearMonth) {
     }
     const sundayPairs = _checkConsecutiveRestPairs(assignments, ono.id) - nonSundayPairs;
 
-    staffChecks[ono.id] = { name: ono.name, section: '薬剤師', items: [
-      { id: 'ono-store', tag: '絶対', status: allEbisu ? 'pass' : 'fail', text: '恵比寿固定', value: allEbisu ? '○' : '他店あり', scoreDelta: 0 },
-      { id: 'ono-rest', tag: '絶対', status: restCount === daysOff ? 'pass' : 'warn', text: `公休数 (${daysOff}日)`, value: `${restCount}日`, scoreDelta: 0 },
-      { id: 'ono-consec', tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連続勤務日数の上限（最大5連勤まで）', value: `${consec}日`, scoreDelta: consec > 5 ? -50 * (consec - 5) : 0 },
-      { id: 'ono-sundaypair', tag: '高', status: sundayPairs >= 1 ? 'pass' : 'warn', text: '日曜日に隣接する2連休の取得', value: `${sundayPairs}回`, scoreDelta: 0 },
-      { id: 'ono-nonsunpair', tag: '高', status: nonSundayPairs === 0 ? 'pass' : 'warn', text: '日曜日を含まない連休（発生時は要確認）', value: nonSundayPairs === 0 ? 'なし○' : `${nonSundayPairs}回`, scoreDelta: nonSundayPairs > 0 ? -nonSundayPairs * 20 : 0 },
-    ]};
+    staffChecks[ono.id] = {
+      name: ono.name, section: '薬剤師', items: [
+        { id: 'ono-store', tag: '絶対', status: allEbisu ? 'pass' : 'fail', text: '恵比寿固定', value: allEbisu ? '○' : '他店あり', scoreDelta: 0 },
+        { id: 'ono-rest', tag: '絶対', status: restCount === daysOff ? 'pass' : 'warn', text: `公休数 (${daysOff}日)`, value: `${restCount}日`, scoreDelta: 0 },
+        { id: 'ono-consec', tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連勤：5連勤まで', value: `${consec}日`, scoreDelta: consec > 5 ? -50 * (consec - 5) : 0 },
+        { id: 'ono-sundaypair', tag: '高', status: sundayPairs >= 1 ? 'pass' : 'warn', text: '日曜隣接2連休', value: `${sundayPairs}回`, scoreDelta: 0 },
+        { id: 'ono-nonsunpair', tag: '高', status: nonSundayPairs === 0 ? 'pass' : 'warn', text: '日曜日を含まない連休', value: nonSundayPairs === 0 ? 'なし○' : `${nonSundayPairs}回`, scoreDelta: nonSundayPairs > 0 ? -nonSundayPairs * 20 : 0 },
+      ]
+    };
   }
 
   // --- 信太（渋谷固定） ---
@@ -578,14 +580,14 @@ function runAllChecks(assignments, yearMonth) {
     const items = [
       { id: 'shinoda-store', tag: '絶対', status: allShibuya ? 'pass' : 'fail', text: '渋谷固定', value: allShibuya ? '○' : '他店あり', scoreDelta: 0 },
       { id: 'shinoda-rest', tag: '絶対', status: restCount === daysOff ? 'pass' : 'warn', text: `公休数 (${daysOff}日)`, value: `${restCount}日`, scoreDelta: 0 },
-      { id: 'shinoda-dev', tag: '絶対', status: devCount <= 2 ? 'pass' : 'fail', text: '開発業務の割り当て回数（最大2回まで）', value: `${devCount}回`, scoreDelta: 0 },
-      { id: 'shinoda-consec', tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連続勤務日数の上限（最大5連勤まで）', value: `${consec}日`, scoreDelta: consec > 5 ? -50 * (consec - 5) : 0 },
-      { id: 'shinoda-pairs', tag: '低', status: pairs >= 2 ? 'pass' : 'warn', text: '2連休の取得回数（シフトに余裕がある場合）', value: `${pairs}回`, scoreDelta: pairs > 0 ? pairs * 5 : 0 },
-      { id: 'shinoda-adjpair', tag: '高', status: adjacentPairs === 0 ? 'pass' : 'warn', text: '2連休同士が過度に近接していないか（ペア分散）', value: adjacentPairs === 0 ? '○' : `${adjacentPairs}箇所`, scoreDelta: adjacentPairs > 0 ? -adjacentPairs * 20 : 0 },
+      { id: 'shinoda-dev', tag: '絶対', status: devCount <= 2 ? 'pass' : 'fail', text: '開発業務の割り当て回数（0~2回まで）', value: `${devCount}回`, scoreDelta: 0 },
+      { id: 'shinoda-consec', tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連勤：5連勤まで', value: `${consec}日`, scoreDelta: consec > 5 ? -50 * (consec - 5) : 0 },
+      { id: 'shinoda-pairs', tag: '低', status: pairs >= 2 ? 'pass' : 'warn', text: '2連休取得回数（シフトに余裕がある場合）', value: `${pairs}回`, scoreDelta: pairs > 0 ? pairs * 5 : 0 },
+      { id: 'shinoda-adjpair', tag: '高', status: adjacentPairs === 0 ? 'pass' : 'warn', text: '連休同士の過度な近接回避', value: adjacentPairs === 0 ? '○' : `${adjacentPairs}箇所`, scoreDelta: adjacentPairs > 0 ? -adjacentPairs * 20 : 0 },
     ];
     if (ono) {
       const overlap = _restOverlap(assignments, shinoda.id, ono.id);
-      items.push({ id: 'shinoda-overlap', tag: '高', status: overlap === 0 ? 'pass' : 'fail', text: '小野との公休被り（日曜日を除く）', value: `${overlap}日`, scoreDelta: overlap > 0 ? -overlap * 30 : 0 });
+      items.push({ id: 'shinoda-overlap', tag: '高', status: overlap === 0 ? 'pass' : 'fail', text: '小野との公休被り', value: `${overlap}日`, scoreDelta: overlap > 0 ? -overlap * 30 : 0 });
     }
     staffChecks[shinoda.id] = { name: shinoda.name, section: '薬剤師', items };
   }
@@ -604,21 +606,25 @@ function runAllChecks(assignments, yearMonth) {
       else if (onoRest) { if (a.work_pattern !== PATTERNS.PART_EBISU) storeViolations++; }
       else { if (a.work_pattern !== PATTERNS.PART_SHIBUYA) storeViolations++; }
     }
-    staffChecks[tokunaga.id] = { name: tokunaga.name, section: '薬剤師', items: [
-      { id: 'tok-days', tag: '絶対', status: workCount >= 15 && workCount <= 22 ? 'pass' : 'fail', text: '勤務日数（基本17日/MAX22日）', value: `${workCount}日`, scoreDelta: 0 },
-      { id: 'tok-sun', tag: '絶対', status: sundays <= 2 ? 'pass' : 'fail', text: '日曜日の出勤回数（最大2回まで）', value: `${sundays}回`, scoreDelta: 0 },
-      { id: 'tok-consec', tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連続勤務日数の上限（最大5連勤まで）', value: `${consec}日`, scoreDelta: consec > 5 ? -50 * (consec - 5) : 0 },
-      { id: 'tok-disp', tag: '絶対', status: consecDispense <= 5 ? 'pass' : 'fail', text: '「調剤」の希望休を含めた連続勤務日数の上限（最大5連勤まで）', value: `${consecDispense}日`, scoreDelta: consecDispense > 5 ? -50 * (consecDispense - 5) : 0 },
-      { id: 'tok-store', tag: '絶対', status: storeViolations === 0 ? 'pass' : 'warn', text: '日曜は渋谷、それ以外は小野の出勤状況に合わせた適切な店舗への配置', value: storeViolations === 0 ? '○' : `${storeViolations}日逸脱`, scoreDelta: 0 },
-    ]};
+    staffChecks[tokunaga.id] = {
+      name: tokunaga.name, section: '薬剤師', items: [
+        { id: 'tok-days', tag: '絶対', status: workCount >= 15 && workCount <= 22 ? 'pass' : 'fail', text: '勤務日数（基本17日/MAX22日）', value: `${workCount}日`, scoreDelta: 0 },
+        { id: 'tok-sun', tag: '絶対', status: sundays <= 2 ? 'pass' : 'fail', text: '日曜出勤：2回まで', value: `${sundays}回`, scoreDelta: 0 },
+        { id: 'tok-consec', tag: '絶対', status: consec <= 5 ? 'pass' : 'fail', text: '連勤：5連勤まで', value: `${consec}日`, scoreDelta: consec > 5 ? -50 * (consec - 5) : 0 },
+        { id: 'tok-disp', tag: '絶対', status: consecDispense <= 5 ? 'pass' : 'fail', text: '「調剤」の希望休を含めた連続勤務日数：5連勤まで', value: `${consecDispense}日`, scoreDelta: consecDispense > 5 ? -50 * (consecDispense - 5) : 0 },
+        { id: 'tok-store', tag: '絶対', status: storeViolations === 0 ? 'pass' : 'warn', text: '日曜は渋谷、それ以外は小野の出勤状況に合わせた店舗配置', value: storeViolations === 0 ? '○' : `${storeViolations}日逸脱`, scoreDelta: 0 },
+      ]
+    };
   }
 
   // --- 村上（穴埋め） ---
   if (murakami) {
     const mWork = work(murakami.id).length;
-    staffChecks[murakami.id] = { name: murakami.name, section: '薬剤師', items: [
-      { id: 'mura-days', tag: '中', status: mWork <= 3 ? 'pass' : 'warn', text: '出勤日数（極力少なく）', value: `${mWork}日`, scoreDelta: mWork > 0 ? -mWork * 10 : 0 },
-    ]};
+    staffChecks[murakami.id] = {
+      name: murakami.name, section: '薬剤師', items: [
+        { id: 'mura-days', tag: '中', status: mWork <= 3 ? 'pass' : 'warn', text: '出勤日数（極力少なく）', value: `${mWork}日`, scoreDelta: mWork > 0 ? -mWork * 10 : 0 },
+      ]
+    };
   }
 
   // --- 事務パート ---
@@ -661,7 +667,7 @@ function runAllChecks(assignments, yearMonth) {
     }
 
     const maxConsec = cond.max_consecutive_days || 5;
-    items.push({ id: `${staff.id}-consec`, tag: '絶対', status: consec <= maxConsec ? 'pass' : 'fail', text: `連続勤務日数の上限（最大${maxConsec}連勤まで）`, value: `${consec}日`, scoreDelta: consec > maxConsec ? -50 * (consec - maxConsec) : 0 });
+    items.push({ id: `${staff.id}-consec`, tag: '絶対', status: consec <= maxConsec ? 'pass' : 'fail', text: `連勤：${maxConsec}連勤まで`, value: `${consec}日`, scoreDelta: consec > maxConsec ? -50 * (consec - maxConsec) : 0 });
     items.push({ id: `${staff.id}-cross`, tag: '中', status: crossCount === 0 ? 'pass' : 'warn', text: `他店舗勤務（${storeName}メイン）`, value: `${crossCount}日`, scoreDelta: crossCount > 0 ? -crossCount * 15 : 0 });
     const priText = `恵:${pri.ebisu ?? '-'} 渋:${pri.shibuya ?? '-'}`;
     items.push({ id: `${staff.id}-pri`, status: 'pass', text: '配置優先順位', value: priText, scoreDelta: 0 });
@@ -818,7 +824,7 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
       const pWork = result.find(a => a.staff_id === staffId && a.date === pdStr && a.work_pattern !== '');
       const pReq = requestMap[`${staffId}_${pdStr}`];
       const pDispense = pReq && pReq.request_type === 'dispense';
-      
+
       if (pWork || pDispense) {
         pastStreak++;
         if (pDispense) includesDispense = true;
@@ -998,7 +1004,7 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
 
       const wcTok = workCounts[tokunaga.id];
       const target = tokunaga.work_conditions?.target_days_per_month || 17;
-      
+
       const currentDay = new Date(dateStr + 'T00:00:00').getDate();
       const progress = currentDay / daysInMonth;
       const ratio = target > 0 ? (wcTok.total / target) : 0;
@@ -1018,7 +1024,7 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
         if (wcTok.total >= target) {
           // すでに基本目標(17)を達成済みなら、不足日以外は休む
           shouldWork = false;
-        } else if (ahead > 0.15) {
+        } else if (ahead > 0.08) {
           // 出勤ペースが早すぎる（前半に固まっている）なら一旦休んで後半に備える
           shouldWork = false;
         } else {
@@ -1040,8 +1046,8 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
       const shinodaAssign = result.find(a => a.staff_id === shinoda.id && a.date === dateStr);
       const tokunagaAssign = result.find(a => a.staff_id === tokunaga.id && a.date === dateStr);
       if (shinodaAssign && !shinodaAssign.is_manual_override &&
-          shinodaAssign.work_pattern === PATTERNS.EMPLOYEE_SHIBUYA &&
-          tokunagaAssign && tokunagaAssign.work_pattern === PATTERNS.PART_SHIBUYA) {
+        shinodaAssign.work_pattern === PATTERNS.EMPLOYEE_SHIBUYA &&
+        tokunagaAssign && tokunagaAssign.work_pattern === PATTERNS.PART_SHIBUYA) {
         shinodaAssign.work_pattern = PATTERNS.DEV;
         devCount++;
       }
@@ -1067,31 +1073,29 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
           const cond = staff.work_conditions || {};
           const target = cond.target_days_per_month || 0;
           const priority = staff.store_priority?.[store] ?? 99;
-          
+          const actual = workCounts[staff.id].total;
+
           if (target === 0) {
-            // 目標なし（本庄さんなど）は純粋な穴埋め要員として、中間の固定スコアを持つ
-            // レギュラーメンバーがペースオーバーになったときだけ自然と出番が来る
-            return 50 - priority; 
+            // 目標なし（本庄さんなど）は穴埋め要員
+            // レギュラーが全員目標達成済みの時だけ出番が来る
+            return 50 - priority;
           }
-          
-          const ratio = workCounts[staff.id].total / target;
-          const ahead = ratio - progress;
-          const needsMore = workCounts[staff.id].total < target;
-          
-          if (!needsMore) {
-            // 既に目標達成した場合は、穴埋めメンバー（50点）よりも出勤優先度を下げる
+
+          if (actual >= target) {
+            // 目標達成済み → 穴埋めメンバーより下
             return 0 - priority;
           }
-          
-          if (ahead > 0.15) {
-            // ペースが早すぎる（前半の固め打ち防止）
-            // 穴埋めメンバー（50点）にシフトを一旦譲るため点数を下げる
-            return 10 - priority;
-          }
-          
-          // ペースが正常、または遅れている（基本のレギュラー配置）
-          // 優先度（priority）を最重要視し、同じ優先度のスタッフ間のみでペース配分を調整する
-          return 1000 - (priority * 100) - (ahead * 100);
+
+          // === 負債（debt）ベースの均等分散スコアリング ===
+          // expected: この時点で本来こなすべき勤務日数
+          // debt: 正=遅れている(出勤すべき), 負=進んでいる(休むべき)
+          const expected = target * progress;
+          const debt = expected - actual;
+
+          // debtをメインスコア、priorityはタイブレーカー
+          // debtが大きい（遅れている）スタッフほどスコアが高く、優先的に出勤
+          // 例: 木庭(target17)がday1で出勤→debt下がる→中村(target10)のdebtが相対的に上→中村が選ばれる
+          return debt * 100 + (10 - priority);
         };
         return getScore(b) - getScore(a);
       });
@@ -1274,7 +1278,7 @@ function computeRestDays(employee, dates, daysOff, requestMap, avoidDates = new 
         let p = null;
         for (const d of dates) {
           if (restDays.has(d.dateStr)) { p = null; continue; }
-          if (d.dow === 0 && isEbisuEmployee) continue; 
+          if (d.dow === 0 && isEbisuEmployee) continue;
           p = p ? p + 1 : 1;
           if (p >= 6 && placed < remaining) {
             // 6連勤目があれば休みにする
@@ -1286,7 +1290,7 @@ function computeRestDays(employee, dates, daysOff, requestMap, avoidDates = new 
           }
         }
       };
-      
+
       const singleCandidates = candidates.filter(d => {
         if (restDays.has(d)) return false;
         // 前後の日が既に公休でないか確認（孤立配置）
@@ -1582,7 +1586,7 @@ function renderGantt() {
       const tw = tooltip.offsetWidth;
       const th = tooltip.offsetHeight;
       tooltip.style.left = (x + tw > window.innerWidth ? e.clientX - tw - 10 : x) + 'px';
-      tooltip.style.top  = (y + th > window.innerHeight ? e.clientY - th - 10 : y) + 'px';
+      tooltip.style.top = (y + th > window.innerHeight ? e.clientY - th - 10 : y) + 'px';
     });
     cell.addEventListener('mouseleave', () => {
       tooltip.style.display = 'none';
