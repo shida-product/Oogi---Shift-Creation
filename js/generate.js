@@ -901,15 +901,17 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
       const onoIsOff = ono && employeeRestDays[ono.id]?.has(dateStr);
       const shinodaIsOff = shinoda && employeeRestDays[shinoda.id]?.has(dateStr);
 
-      if (onoIsOff) {
+      // 日曜は恵比寿が定休なので、必ず渋谷（isEbisuClosedチェックを最優先）
+      if (isEbisuClosed) {
+        tokunagaPattern = PATTERNS.PART_SHIBUYA;
+        // 信太が休みの場合は渋谷不足
+        if (shinodaIsOff) isShortage = true;
+      } else if (onoIsOff) {
         tokunagaPattern = PATTERNS.PART_EBISU;
         isShortage = true;
       } else if (shinodaIsOff) {
-        // 渋谷不足
         tokunagaPattern = PATTERNS.PART_SHIBUYA;
         isShortage = true;
-      } else if (isEbisuClosed) {
-        tokunagaPattern = PATTERNS.PART_SHIBUYA;
       }
 
       const wcTok = workCounts[tokunaga.id];
