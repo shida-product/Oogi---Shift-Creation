@@ -164,8 +164,6 @@ function handleRedo() {
 async function handleReset() {
   if (!state.baselineAssignments) return;
   state.assignments = cloneAssignments(state.baselineAssignments);
-  // 手動変更フラグもクリア（赤バッジ除去）
-  state.assignments.forEach(a => a.is_manual_override = false);
   // 履歴をクリアして初期状態に戻す
   state.history = [cloneAssignments(state.assignments)];
   state.historyIndex = 0;
@@ -182,7 +180,7 @@ function updateUndoRedoButtons() {
   const resetBtn = document.getElementById('btn-reset');
   if (undoBtn) undoBtn.disabled = state.historyIndex <= 0;
   if (redoBtn) redoBtn.disabled = state.historyIndex >= state.history.length - 1;
-  if (resetBtn) resetBtn.disabled = !state.baselineAssignments;
+  if (resetBtn) resetBtn.disabled = !state.baselineAssignments || state.historyIndex <= 0;
 }
 
 // ============================================================
@@ -313,6 +311,12 @@ async function loadExistingAssignments() {
     document.getElementById('btn-csv').disabled = false;
     renderGantt();
     renderConditionsCheck();
+
+    // 初期状態を保存（リセット・Undo用）
+    state.baselineAssignments = cloneAssignments(state.assignments);
+    state.history = [cloneAssignments(state.assignments)];
+    state.historyIndex = 0;
+    updateUndoRedoButtons();
   } else {
     state.hasGenerated = false;
     document.getElementById('btn-csv').disabled = true;
@@ -320,6 +324,11 @@ async function loadExistingAssignments() {
     document.getElementById('gantt-placeholder').style.display = 'flex';
     const condPanel = document.getElementById('conditions-panel');
     if (condPanel) condPanel.style.display = 'none';
+
+    state.baselineAssignments = null;
+    state.history = [];
+    state.historyIndex = -1;
+    updateUndoRedoButtons();
   }
 }
 
