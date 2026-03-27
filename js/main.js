@@ -10,6 +10,47 @@
 import { supabase } from './supabase-config.js';
 
 // ============================================================
+// スタッフカラーパレット（個人別色分け・カレンダー表示用）
+// ============================================================
+const STAFF_COLOR_PALETTE = [
+  { bg: '#e0e7ff', text: '#4338ca' }, // indigo
+  { bg: '#d1fae5', text: '#059669' }, // emerald
+  { bg: '#fee2e2', text: '#dc2626' }, // rose
+  { bg: '#fef3c7', text: '#d97706' }, // amber
+  { bg: '#e0f2fe', text: '#0284c7' }, // sky
+  { bg: '#ede9fe', text: '#7c3aed' }, // violet
+  { bg: '#fce7f3', text: '#db2777' }, // pink
+  { bg: '#ffedd5', text: '#ea580c' }, // orange
+  { bg: '#cffafe', text: '#0e7490' }, // cyan
+  { bg: '#ecfccb', text: '#4d7c0f' }, // lime
+];
+
+const STAFF_SPECIFIC_COLORS = {
+  '村上': '#E73B3B',
+  '信太': '#212121',
+  '小野': '#F35F8C',
+  '徳永': '#2ECC87',
+  '木庭': '#47B2F7',
+  '中村': '#FDC02D',
+  '諫早': '#948078',
+  '本庄': '#B38BDC'
+};
+
+function getStaffColor(staffId) {
+  const staff = state.staffList.find(s => s.id === staffId);
+  if (staff) {
+    for (const [key, hex] of Object.entries(STAFF_SPECIFIC_COLORS)) {
+      if (staff.name.includes(key)) {
+        // バックグラウンドに指定色を使用し、文字色は白に統一
+        return { bg: hex, text: '#ffffff' };
+      }
+    }
+  }
+  const idx = state.staffList.findIndex(s => s.id === staffId);
+  return STAFF_COLOR_PALETTE[Math.max(0, idx) % STAFF_COLOR_PALETTE.length];
+}
+
+// ============================================================
 // 祝日データ（日本の祝日）
 // ============================================================
 function getHolidays(year) {
@@ -107,10 +148,7 @@ function bindEvents() {
   document.getElementById('prev-month').addEventListener('click', () => changeMonth(-1));
   document.getElementById('next-month').addEventListener('click', () => changeMonth(1));
 
-  document.getElementById('staff-select').addEventListener('change', (e) => {
-    state.selectedStaffId = e.target.value;
-    localStorage.setItem('selectedStaffId', state.selectedStaffId);
-  });
+
 
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('modal-overlay').addEventListener('click', (e) => {
@@ -118,6 +156,20 @@ function bindEvents() {
   });
   document.getElementById('modal-save').addEventListener('click', handleModalSave);
   document.getElementById('modal-delete').addEventListener('click', handleModalDelete);
+
+  // ボトムシート
+  document.getElementById('bottom-sheet-close').addEventListener('click', closeBottomSheet);
+  document.getElementById('bottom-sheet-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeBottomSheet();
+  });
+
+  // FAB：今日の日付でモーダルを開く
+  document.getElementById('fab-add').addEventListener('click', () => {
+    openModal(state.selectedStaffId, [formatDate(new Date())]);
+  });
+
+  // 画面回転・リサイズ対応
+  window.addEventListener('resize', updateFabVisibility);
 
   setupGanttDrag();
   setupGanttHover();
@@ -184,8 +236,16 @@ function setupGanttDrag() {
     clearHighlight();
     if (dragCells.length === 0) return;
 
-    const dates = dragCells.map(c => c.dataset.date);
+    let dates = dragCells.map(c => c.dataset.date);
     const staffId = dragStaffId;
+    
+    // 単回クリック時に、クリック要素がロングバーの一部の場合、同じグループ全体を選択する
+    if (dragCells.length === 1) {
+      const marker = dragCells[0].querySelector('.marker');
+      if (marker) {
+        dates = getGroupDates(staffId, dates[0]);
+      }
+    }
     
     // 初期化
     dragCells = [];
@@ -246,7 +306,6 @@ async function loadStaffList() {
     .order('display_order');
   if (error) { console.error(error); return; }
   state.staffList = data || [];
-  renderStaffSelect();
 }
 
 async function loadRequests() {
@@ -271,6 +330,7 @@ async function loadRequests() {
 // 月の切り替え
 // ============================================================
 function changeMonth(delta) {
+  closeBottomSheet();
   state.currentMonth += delta;
   if (state.currentMonth > 11) { state.currentMonth = 0; state.currentYear++; }
   else if (state.currentMonth < 0) { state.currentMonth = 11; state.currentYear--; }
@@ -283,20 +343,6 @@ function renderMonth() {
   document.getElementById('month-label').textContent = `${state.currentYear}年 ${state.currentMonth + 1}月`;
 }
 
-// ============================================================
-// スタッフ選択プルダウン（スマホ用ヘッダー）
-// ============================================================
-function renderStaffSelect() {
-  const select = document.getElementById('staff-select');
-  select.innerHTML = '<option value="">選択してください</option>';
-  state.staffList.forEach(s => {
-    const opt = document.createElement('option');
-    opt.value = s.id;
-    opt.textContent = s.name;
-    if (s.id === state.selectedStaffId) opt.selected = true;
-    select.appendChild(opt);
-  });
-}
 
 // ============================================================
 // ガントチャート描画（PC）
@@ -329,9 +375,51 @@ function renderGantt() {
   let bodyHtml = '';
   state.staffList.forEach(staff => {
     bodyHtml += `<tr><td class="staff-name">${escapeHtml(staff.name)}</td>`;
+    // 1ヶ月分の予定を配列化して連続判定を行いやすくする
+    const staffReqs = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const req = state.requests.find(r => r.staff_id === staff.id && r.date === dateStr);
+      staffReqs.push({
+        dateStr,
+        req: state.requests.find(r => r.staff_id === staff.id && r.date === dateStr)
+      });
+    }
+
+    let currentGroupId = null;
+    let currentType = null;
+    let currentNote = null;
+
+    for (let d = 0; d < daysInMonth; d++) {
+      const { dateStr, req } = staffReqs[d];
+      let isBarStart = false, isBarMiddle = false, isBarEnd = false;
+      let groupId = null;
+
+      if (req) {
+        if (currentType === req.request_type && currentNote === req.note) {
+          // 前日と同じリクエストが継続
+        } else {
+          // 新しいグループの開始
+          currentGroupId = req.id || dateStr;
+          currentType = req.request_type;
+          currentNote = req.note;
+        }
+        groupId = currentGroupId;
+
+        // 前後の予定を取得して連続性を判定
+        const nextReq = staffReqs[d + 1]?.req;
+        const hasNext = nextReq && nextReq.request_type === currentType && nextReq.note === currentNote;
+        const prevReq = staffReqs[d - 1]?.req;
+        const hasPrev = prevReq && prevReq.request_type === currentType && prevReq.note === currentNote;
+
+        if (!hasPrev && hasNext) isBarStart = true;
+        if (hasPrev && hasNext) isBarMiddle = true;
+        if (hasPrev && !hasNext) isBarEnd = true;
+      } else {
+        currentGroupId = null;
+        currentType = null;
+        currentNote = null;
+      }
+
       let cell = '';
       if (req) {
         let cls, label;
@@ -342,7 +430,14 @@ function renderGantt() {
           case 'dispense': cls = 'marker--dispense'; label = '調'; break;
           default: cls = 'marker--other'; label = '他'; break;
         }
-        cell = `<div class="marker ${cls}" title="${escapeHtml(req.note || '')}">${label}</div>`;
+        
+        // ロングバー用のクラスとデータ属性
+        let extraCls = '';
+        if (isBarStart) extraCls = ' is-bar-start';
+        else if (isBarMiddle) extraCls = ' is-bar-middle';
+        else if (isBarEnd) extraCls = ' is-bar-end';
+
+        cell = `<div class="marker ${cls}${extraCls}" data-group-id="${groupId}" title="${escapeHtml(req.note || '')}">${label}</div>`;
       }
       bodyHtml += `<td class="day-cell" data-staff="${staff.id}" data-date="${dateStr}">${cell}</td>`;
     }
@@ -352,7 +447,7 @@ function renderGantt() {
 }
 
 // ============================================================
-// カレンダー描画（スマホ）
+// カレンダー描画（スマホ）- Google Calendar 風
 // ============================================================
 function renderCalendar() {
   const grid = document.getElementById('calendar-grid');
@@ -381,21 +476,49 @@ function renderCalendar() {
     if (dow === 6) classes.push('is-saturday');
     if (isHoliday) classes.push('is-holiday');
 
-    const dayReqs = state.requests.filter(r => r.date === dateStr);
-    let badges = '';
-    dayReqs.slice(0, 3).forEach(r => {
-      let cls = 'calendar-badge--other';
-      if (r.request_type === 'off') cls = 'calendar-badge--off';
-      else if (r.request_type === 'am') cls = 'calendar-badge--am';
-      else if (r.request_type === 'pm') cls = 'calendar-badge--pm';
-      else if (r.request_type === 'dispense') cls = 'calendar-badge--dispense';
-      badges += `<div class="calendar-badge ${cls}">${escapeHtml(r.staff?.name || '?')}</div>`;
+    const dayReqs = state.requests
+      .filter(r => r.date === dateStr)
+      .sort((a, b) => getGroupDates(b.staff_id, b.date).length - getGroupDates(a.staff_id, a.date).length);
+    let eventsHtml = '';
+    dayReqs.forEach(r => {
+      const { bg, text } = getStaffColor(r.staff_id);
+      
+      const fullName = r.staff?.name || '?';
+      const lastName = fullName.split(/[\s　]+/)[0];
+
+      let typeLabel = '';
+      if (r.request_type === 'am') typeLabel = ' AM可';
+      else if (r.request_type === 'pm') typeLabel = ' PM可';
+      else if (r.request_type === 'dispense') typeLabel = ' 調剤';
+      else if (r.request_type === 'other') typeLabel = ' その他';
+
+      let isBarStart = false, isBarMiddle = false, isBarEnd = false;
+      const prevDateObj = new Date(dt); prevDateObj.setDate(prevDateObj.getDate() - 1);
+      const prevDateStr = formatDate(prevDateObj);
+      const nextDateObj = new Date(dt); nextDateObj.setDate(nextDateObj.getDate() + 1);
+      const nextDateStr = formatDate(nextDateObj);
+
+      const prevReq = state.requests.find(pr => pr.staff_id === r.staff_id && pr.date === prevDateStr);
+      const nextReq = state.requests.find(nr => nr.staff_id === r.staff_id && nr.date === nextDateStr);
+
+      const hasPrev = prevReq && prevReq.request_type === r.request_type && prevReq.note === r.note;
+      const hasNext = nextReq && nextReq.request_type === r.request_type && nextReq.note === r.note;
+
+      if (!hasPrev && hasNext) isBarStart = true;
+      if (hasPrev && hasNext) isBarMiddle = true;
+      if (hasPrev && !hasNext) isBarEnd = true;
+
+      let extraCls = '';
+      if (isBarStart) extraCls = ' is-bar-start';
+      else if (isBarMiddle) extraCls = ' is-bar-middle';
+      else if (isBarEnd) extraCls = ' is-bar-end';
+
+      eventsHtml += `<span class="cal-evt${extraCls}" style="background:${bg};color:${text};">${escapeHtml(lastName + typeLabel)}</span>`;
     });
-    if (dayReqs.length > 3) badges += `<div class="calendar-badge calendar-badge--more">+${dayReqs.length - 3}</div>`;
 
     html += `<div class="${classes.join(' ')}" data-date="${dateStr}">
-      <div class="calendar-grid__date">${d}</div>
-      <div class="calendar-grid__badges">${badges}</div>
+      <div class="cal-date"><span class="cal-date__num${dateStr === todayStr ? ' cal-date__num--today' : ''}">${d}</span></div>
+      <div class="cal-events">${eventsHtml}</div>
     </div>`;
   }
   grid.innerHTML = html;
@@ -406,45 +529,114 @@ function renderCalendar() {
 }
 
 function showDayDetail(dateStr) {
-  const detail = document.getElementById('day-detail');
   const dayReqs = state.requests.filter(r => r.date === dateStr);
   const dt = new Date(dateStr + 'T00:00:00');
   const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
   const title = `${dt.getMonth() + 1}/${dt.getDate()}（${dayNames[dt.getDay()]}）`;
   const holiday = state.holidays[dateStr];
 
-  let html = `<div class="day-detail__title">${title}${holiday ? ` <span style="color:var(--color-danger);font-size:var(--font-size-xs)">${holiday}</span>` : ''}</div>`;
+  // 選択セルをハイライト
+  document.querySelectorAll('.calendar-grid__cell.is-selected').forEach(c => c.classList.remove('is-selected'));
+  const selectedCell = document.querySelector(`.calendar-grid__cell[data-date="${dateStr}"]`);
+  if (selectedCell) selectedCell.classList.add('is-selected');
+
+  // タイトル（祝日ラベル付き）
+  const titleEl = document.getElementById('bottom-sheet-title');
+  titleEl.textContent = title;
+  if (holiday) {
+    const badge = document.createElement('span');
+    badge.textContent = ` ${holiday}`;
+    badge.style.cssText = 'font-size:var(--font-size-xs);color:var(--color-danger);font-weight:500;';
+    titleEl.appendChild(badge);
+  }
+
+  // ボトムシートの中身
+  let bodyHtml = '';
   if (dayReqs.length === 0) {
-    html += '<p style="font-size:var(--font-size-sm);color:var(--color-text-muted);">希望なし</p>';
+    bodyHtml = '<p style="font-size:var(--font-size-sm);color:var(--color-text-muted);padding:4px 0 8px;">この日の希望はありません</p>';
   } else {
-    html += '<ul class="day-detail__list">';
+    bodyHtml = '<ul class="day-detail__list">';
     dayReqs.forEach(r => {
-      let type, cls;
+      let type, evtCls;
       switch (r.request_type) {
-        case 'off': type = '休み希望'; cls = 'calendar-badge--off'; break;
-        case 'am': type = 'AM可'; cls = 'calendar-badge--am'; break;
-        case 'pm': type = 'PM可'; cls = 'calendar-badge--pm'; break;
-        case 'dispense': type = '調剤'; cls = 'calendar-badge--dispense'; break;
-        default: type = 'その他'; cls = 'calendar-badge--other'; break;
+        case 'off':      type = '休み希望'; evtCls = 'cal-evt--off';      break;
+        case 'am':       type = 'AM可';    evtCls = 'cal-evt--am';       break;
+        case 'pm':       type = 'PM可';    evtCls = 'cal-evt--pm';       break;
+        case 'dispense': type = '調剤';    evtCls = 'cal-evt--dispense'; break;
+        default:         type = 'その他';  evtCls = 'cal-evt--other';    break;
       }
-      const note = r.note ? ` - ${escapeHtml(r.note)}` : '';
-      html += `<li class="day-detail__item"><span>${escapeHtml(r.staff?.name || '?')}${note}</span><span class="day-detail__type-badge ${cls}">${type}</span></li>`;
-
+      const note = r.note
+        ? `<span class="day-detail__note">${escapeHtml(r.note)}</span>`
+        : '';
+      bodyHtml += `<li class="day-detail__item day-detail__item--tappable" data-staff-id="${r.staff_id}" data-date="${dateStr}">
+        <span class="day-detail__name">${escapeHtml(r.staff?.name || '?')}</span>
+        <span class="cal-evt ${evtCls}" style="padding:3px 10px;border-radius:var(--radius-full);flex-shrink:0;">${type}</span>
+        <i data-lucide="chevron-right" class="day-detail__chevron"></i>
+        ${note}
+      </li>`;
     });
-    html += '</ul>';
+    bodyHtml += '</ul>';
   }
 
-  if (state.selectedStaffId) {
-    html += `<button class="btn btn--primary btn--sm" style="margin-top:12px;width:100%;" id="day-detail-add">＋ 希望を登録</button>`;
-  } else {
-    html += `<p style="font-size:var(--font-size-xs);color:var(--color-text-muted);margin-top:8px;">上部で担当を選択すると登録できます</p>`;
-  }
+  // 新規登録ボタン（常に表示、スタッフ未選択時はモーダル内で選択）
+  bodyHtml += `<button class="btn btn--primary btn--sm" style="width:100%;margin-top:14px;" id="bottom-sheet-add">
+    <i data-lucide="plus" style="width:14px;height:14px;"></i> 新規登録
+  </button>`;
 
-  detail.innerHTML = html;
-  detail.style.display = 'block';
+  document.getElementById('bottom-sheet-body').innerHTML = bodyHtml;
+  document.getElementById('bottom-sheet-overlay').classList.add('active');
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 
-  const addBtn = document.getElementById('day-detail-add');
-  if (addBtn) addBtn.addEventListener('click', () => openModal(state.selectedStaffId, [dateStr]));
+  // 既存イベントタップ → 編集モーダル（グループ全体を渡す）
+  document.querySelectorAll('.day-detail__item--tappable').forEach(item => {
+    item.addEventListener('click', () => {
+      closeBottomSheet();
+      const groupDates = getGroupDates(item.dataset.staffId, item.dataset.date);
+      openModal(item.dataset.staffId, groupDates);
+    });
+  });
+
+  // 新規登録ボタン → 登録モーダル（選択中スタッフ or 先頭スタッフ）
+  document.getElementById('bottom-sheet-add').addEventListener('click', () => {
+    closeBottomSheet();
+    openModal(state.selectedStaffId || state.staffList[0]?.id, [dateStr]);
+  });
+}
+
+function closeBottomSheet() {
+  const overlay = document.getElementById('bottom-sheet-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  document.getElementById('bottom-sheet-title').textContent = '';
+  document.getElementById('bottom-sheet-body').innerHTML = '';
+  document.querySelectorAll('.calendar-grid__cell.is-selected').forEach(c => c.classList.remove('is-selected'));
+}
+
+function renderStaffChips() {
+  const container = document.getElementById('staff-chips');
+  if (!container) return;
+  container.innerHTML = state.staffList.map(s => {
+    const isActive = s.id === state.selectedStaffId;
+    const { text } = getStaffColor(s.id);
+    return `<button class="staff-chip${isActive ? ' is-active' : ''}" data-staff-id="${s.id}"><span class="staff-chip__dot" style="background:${text};"></span>${escapeHtml(s.name)}</button>`;
+  }).join('');
+  container.querySelectorAll('.staff-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      state.selectedStaffId = chip.dataset.staffId;
+      localStorage.setItem('selectedStaffId', state.selectedStaffId);
+      document.getElementById('staff-select').value = state.selectedStaffId;
+      updateDispenseVisibility(state.selectedStaffId);
+      renderStaffChips();
+      updateFabVisibility();
+    });
+  });
+}
+
+function updateFabVisibility() {
+  const fab = document.getElementById('fab-add');
+  if (!fab) return;
+  const isMobile = window.innerWidth <= 768;
+  fab.style.display = (state.selectedStaffId && isMobile) ? 'flex' : 'none';
 }
 
 // ============================================================
@@ -467,7 +659,8 @@ function renderOtherList() {
   otherReqs.forEach(r => {
     const dt = new Date(r.date + 'T00:00:00');
     const dateLabel = `${dt.getMonth() + 1}/${dt.getDate()}（${dayNames[dt.getDay()]}）`;
-    const staffName = r.staff?.name || '不明';
+    const fullName = r.staff?.name || '不明';
+    const lastName = fullName.split(/[\s　]+/)[0];
     
     let typeLabel;
     if (r.request_type === 'am') typeLabel = 'AM可';
@@ -475,15 +668,26 @@ function renderOtherList() {
     else if (r.request_type === 'dispense') typeLabel = '調剤';
     else typeLabel = 'その他';
 
-    html += `<div class="other-list__item">
+    const noteHtml = r.note ? `<span class="other-list__note">${escapeHtml(r.note)}</span>` : '';
+
+    html += `<div class="other-list__item other-list__item--clickable" data-staff-id="${r.staff_id}" data-date="${r.date}">
       <span class="other-list__date">${dateLabel}</span>
-      <span class="other-list__staff">${escapeHtml(staffName)}</span>
-      <span class="other-list__type" style="font-size:0.75rem;font-weight:600;min-width:60px;">${typeLabel}</span>
-      <span class="other-list__note">${escapeHtml(r.note || '')}</span>
+      <span class="other-list__staff">${escapeHtml(lastName)} ${typeLabel}</span>
+      ${noteHtml}
+      <i data-lucide="pencil" class="other-list__edit-icon"></i>
     </div>`;
   });
   html += '</div>';
   container.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+
+  // 各アイテムクリックで編集モーダルを開く（グループ全体を渡す）
+  container.querySelectorAll('.other-list__item--clickable').forEach(item => {
+    item.addEventListener('click', () => {
+      const groupDates = getGroupDates(item.dataset.staffId, item.dataset.date);
+      openModal(item.dataset.staffId, groupDates);
+    });
+  });
 }
 
 // ============================================================
@@ -492,14 +696,11 @@ function renderOtherList() {
 function updateDispenseVisibility(staffId) {
   const staff = state.staffList.find(s => s.id === staffId);
   const labelDispense = document.getElementById('label-dispense');
-  const legendDispense = document.getElementById('legend-dispense-item');
   if (labelDispense) {
-    if (staff && staff.name === '徳永麻衣子') {
+    if (staff && staff.name.includes('徳永')) {
       labelDispense.style.display = 'inline-flex';
-      if (legendDispense) legendDispense.style.display = 'inline-block';
     } else {
       labelDispense.style.display = 'none';
-      if (legendDispense) legendDispense.style.display = 'none';
       const radio = document.querySelector('input[name="request-type"][value="dispense"]');
       if (radio && radio.checked) {
         document.querySelector('input[name="request-type"][value="off"]').checked = true;
@@ -542,23 +743,21 @@ function openModal(staffId, dates) {
       `${first.getMonth() + 1}/${first.getDate()} 〜 ${last.getMonth() + 1}/${last.getDate()}（${dates.length}日間）`;
   }
 
-  const datesInfo = document.getElementById('modal-dates-info');
-  if (dates.length > 1) {
-    datesInfo.textContent = '対象: ' + dates.map(d => {
-      const dt = new Date(d + 'T00:00:00');
-      return `${dt.getDate()}日`;
-    }).join(', ');
-    datesInfo.style.display = 'block';
-  } else {
-    datesInfo.style.display = 'none';
-  }
+  // 日付の初期値をセット
+  const startDate = dates[0];
+  const endDate = dates[dates.length - 1];
+  const startInput = document.getElementById('modal-date-start');
+  const endInput = document.getElementById('modal-date-end');
+  startInput.value = startDate;
+  endInput.value = endDate;
 
-  const existing = dates.length === 1
-    ? state.requests.find(r => r.staff_id === staffId && r.date === dates[0])
-    : null;
+  // 複数日でも先頭日付に既存データがあれば編集モード
+  const existing = state.requests.find(r => r.staff_id === staffId && r.date === dates[0]);
   state.editingRequest = existing || null;
 
   if (existing) {
+    startInput.disabled = false;
+    endInput.disabled = false;
     document.querySelector(`input[name="request-type"][value="${existing.request_type}"]`).checked = true;
     document.getElementById('modal-note').value = existing.note || '';
     document.getElementById('modal-delete').style.display = 'inline-flex';
@@ -574,6 +773,8 @@ function openModal(staffId, dates) {
     }
     document.getElementById('modal-history').style.display = 'block';
   } else {
+    startInput.disabled = false;
+    endInput.disabled = false;
     document.querySelector('input[name="request-type"][value="off"]').checked = true;
     document.getElementById('modal-note').value = '';
     document.getElementById('modal-delete').style.display = 'none';
@@ -600,21 +801,50 @@ async function handleModalSave() {
     return;
   }
 
-  if (state.editingRequest) {
-    const { error } = await supabase
-      .from('shift_requests')
-      .update({ staff_id: staffId, request_type: type, note: note || null, updated_at: new Date().toISOString() })
-      .eq('id', state.editingRequest.id);
-    if (error) { console.error(error); alert('保存に失敗: ' + error.message); return; }
-  } else {
-    const newDates = state.editingDates.filter(d =>
-      !state.requests.find(r => r.staff_id === staffId && r.date === d)
-    );
-    if (newDates.length === 0) {
-      alert('選択した日付はすべて登録済みです');
-      return;
+  const startStr = document.getElementById('modal-date-start').value;
+  const endStr = document.getElementById('modal-date-end').value;
+  
+  if (!startStr || !endStr) {
+    alert('対象日を選択してください');
+    return;
+  }
+  if (startStr > endStr) {
+    alert('終了日は開始日以降の日付を選択してください');
+    return;
+  }
+
+  const targetDates = [];
+  const currDt = new Date(startStr + 'T00:00:00');
+  const endDt = new Date(endStr + 'T00:00:00');
+  
+  while (currDt <= endDt) {
+    targetDates.push(formatDate(currDt));
+    currDt.setDate(currDt.getDate() + 1);
+  }
+
+  const toUpdate = [];
+  const toInsert = [];
+
+  for (const d of targetDates) {
+    const existingReq = state.requests.find(r => r.staff_id === staffId && r.date === d);
+    if (existingReq) {
+      toUpdate.push(existingReq);
+    } else {
+      toInsert.push(d);
     }
-    const rows = newDates.map(d => ({
+  }
+
+  // UPDATE処理（既存レコードがある日は上書き）
+  for (const req of toUpdate) {
+    const { error } = await supabase.from('shift_requests')
+      .update({ request_type: type, note: note || null, updated_at: new Date().toISOString() })
+      .eq('id', req.id);
+    if (error) { console.error(error); alert('更新に失敗: ' + error.message); return; }
+  }
+
+  // INSERT処理（無い日は新規追加）
+  if (toInsert.length > 0) {
+    const rows = toInsert.map(d => ({
       staff_id: staffId, date: d, request_type: type,
       note: note || null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }));
@@ -628,13 +858,63 @@ async function handleModalSave() {
 
 async function handleModalDelete() {
   if (!state.editingRequest) return;
-  if (!confirm('この希望を削除しますか？')) return;
 
-  const { error } = await supabase.from('shift_requests').delete().eq('id', state.editingRequest.id);
+  const staffId = document.getElementById('modal-staff-select').value;
+  const startStr = document.getElementById('modal-date-start').value;
+  const endStr = document.getElementById('modal-date-end').value;
+
+  // 対象日付の配列を生成
+  const deleteDates = [];
+  const cur = new Date(startStr + 'T00:00:00');
+  const end = new Date(endStr + 'T00:00:00');
+  while (cur <= end) { deleteDates.push(formatDate(cur)); cur.setDate(cur.getDate() + 1); }
+
+  const deleteIds = state.requests
+    .filter(r => r.staff_id === staffId && deleteDates.includes(r.date))
+    .map(r => r.id);
+
+  if (deleteIds.length === 0) return;
+
+  const label = deleteDates.length === 1 ? 'この希望を削除しますか？' : `${deleteDates.length}日分の希望をまとめて削除しますか？`;
+  if (!confirm(label)) return;
+
+  const { error } = await supabase.from('shift_requests').delete().in('id', deleteIds);
   if (error) { console.error(error); alert('削除に失敗'); return; }
 
   closeModal();
   await loadRequests();
+}
+
+// ============================================================
+// グループ日付抽出ヘルパー
+// 指定スタッフ・日付から同一条件（種類＋備考）で連続する日付の配列を返す
+// ============================================================
+function getGroupDates(staffId, dateStr) {
+  const anchor = state.requests.find(r => r.staff_id === staffId && r.date === dateStr);
+  if (!anchor) return [dateStr];
+
+  const dates = [dateStr];
+  // 前方に探索
+  let d = new Date(dateStr + 'T00:00:00');
+  while (true) {
+    d.setDate(d.getDate() - 1);
+    const ds = formatDate(d);
+    const r = state.requests.find(r => r.staff_id === staffId && r.date === ds);
+    if (r && r.request_type === anchor.request_type && r.note === anchor.note) {
+      dates.unshift(ds);
+    } else break;
+  }
+  // 後方に探索
+  d = new Date(dateStr + 'T00:00:00');
+  while (true) {
+    d.setDate(d.getDate() + 1);
+    const ds = formatDate(d);
+    const r = state.requests.find(r => r.staff_id === staffId && r.date === ds);
+    if (r && r.request_type === anchor.request_type && r.note === anchor.note) {
+      dates.push(ds);
+    } else break;
+  }
+  return dates;
 }
 
 function getLastDayOfMonth(year, month) {

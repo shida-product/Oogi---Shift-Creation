@@ -157,6 +157,14 @@ button { cursor: pointer; border: none; background: none; }
   background: var(--color-primary-bg);
 }
 
+/* ヘッダー内セパレーター */
+.header-divider {
+  width: 1px;
+  height: 24px;
+  background-color: var(--color-text-muted);
+  margin: 0;
+}
+
 /* Card Surface */
 .card-surface {
   background: var(--color-surface);
@@ -405,9 +413,10 @@ select.input-field,
 }
 .modal__radio-label input[type="radio"] { display: none; }
 .modal__radio-label:has(input:checked) {
-  background: var(--color-primary-bg);
-  color: var(--color-primary-text);
-  border-color: var(--color-primary-bg);
+  background: var(--color-primary);
+  color: #ffffff;
+  border-color: var(--color-primary);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
 }
 .radio-dot { width: 10px; height: 10px; border-radius: 50%; }
 .radio-dot--off { background: var(--color-off); }
@@ -462,8 +471,19 @@ select.input-field,
 
 /* Mobile */
 @media (max-width: 768px) {
-  .app-header { padding: 0 16px; height: 56px; }
+  .app-header { 
+    padding: 12px 16px; 
+    height: auto; 
+    flex-wrap: wrap; 
+    gap: 12px;
+  }
   .app-header__title { font-size: var(--font-size-base); }
+  .app-header .month-nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+  }
+  .header-divider { display: none; }
   .month-nav__label { min-width: 110px; font-size: var(--font-size-sm); }
   .toast-container { bottom: 20px; right: 20px; left: 20px; }
   .toast { width: 100%; justify-content: center; }
