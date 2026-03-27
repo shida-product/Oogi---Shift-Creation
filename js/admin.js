@@ -81,7 +81,15 @@ function renderStaffList() {
     const cond = staff.work_conditions || {};
     const condParts = [];
     if (cond.min_days_per_week) condParts.push(`週${cond.min_days_per_week}日〜`);
-    if (cond.target_days_per_month) condParts.push(`月${cond.target_days_per_month}回`);
+    if (cond.target_days_per_month) {
+      if (cond.max_days_per_month && cond.max_days_per_month !== cond.target_days_per_month) {
+        condParts.push(`月${cond.target_days_per_month}〜${cond.max_days_per_month}回`);
+      } else {
+        condParts.push(`月${cond.target_days_per_month}回`);
+      }
+    } else if (cond.max_days_per_month) {
+      condParts.push(`最大月${cond.max_days_per_month}回`);
+    }
     if (cond.max_sunday_per_month != null) condParts.push(`日曜${cond.max_sunday_per_month}回迄`);
     if (cond.alternating_weeks) condParts.push(`${cond.alternating_weeks.join('/')}交互`);
     const condSummary = condParts.length > 0 ? condParts.join(' / ') : '';
@@ -159,6 +167,7 @@ window.openEditModal = function (id) {
   const cond = staff.work_conditions || {};
   document.getElementById('edit-min-days').value = cond.min_days_per_week || '';
   document.getElementById('edit-target-month').value = cond.target_days_per_month || '';
+  document.getElementById('edit-max-month').value = cond.max_days_per_month || '';
   document.getElementById('edit-max-sunday').value = cond.max_sunday_per_month ?? '';
 
   const prio = staff.store_priority || {};
@@ -180,9 +189,11 @@ async function saveEditModal() {
   const workConditions = {};
   const minDays = parseInt(document.getElementById('edit-min-days').value);
   const targetMonth = parseInt(document.getElementById('edit-target-month').value);
+  const maxMonth = parseInt(document.getElementById('edit-max-month').value);
   const maxSunday = parseInt(document.getElementById('edit-max-sunday').value);
   if (!isNaN(minDays) && minDays > 0) workConditions.min_days_per_week = minDays;
   if (!isNaN(targetMonth) && targetMonth > 0) workConditions.target_days_per_month = targetMonth;
+  if (!isNaN(maxMonth) && maxMonth > 0) workConditions.max_days_per_month = maxMonth;
   if (!isNaN(maxSunday)) workConditions.max_sunday_per_month = maxSunday;
 
   // 店舗優先順位をJSONに組み立て
