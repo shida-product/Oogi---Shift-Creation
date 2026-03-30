@@ -309,6 +309,17 @@ button { cursor: pointer; border: none; background: none; }
   height: 12px;
   border-radius: 50%;
 }
+.legend__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  font-size: 0.70rem;
+  font-weight: 700;
+  margin-right: 4px;
+}
 /* dot colors */
 .legend__dot--employee-ebisu  { background: #1A42CF; }
 .legend__dot--employee-shibuya { background: #FA88CF; }
@@ -326,6 +337,12 @@ button { cursor: pointer; border: none; background: none; }
 .legend__dot--stripe-am       { background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(16,185,129,0.35) 2px, rgba(16,185,129,0.35) 4px); }
 .legend__dot--stripe-pm       { background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(14,165,233,0.35) 2px, rgba(14,165,233,0.35) 4px); }
 .legend__dot--stripe-dispense { background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(230,126,34,0.40) 2px, rgba(230,126,34,0.40) 4px); }
+
+/* stripe markers for legend */
+.marker--stripe-off      { background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(244,63,94,0.35) 2px, rgba(244,63,94,0.35) 4px); color: var(--color-off); }
+.marker--stripe-am       { background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(16,185,129,0.35) 2px, rgba(16,185,129,0.35) 4px); color: var(--color-am); }
+.marker--stripe-pm       { background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(14,165,233,0.35) 2px, rgba(14,165,233,0.35) 4px); color: var(--color-pm); }
+.marker--stripe-dispense { background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(230,126,34,0.40) 2px, rgba(230,126,34,0.40) 4px); color: #e67e22; }
 .legend__dot--manual          { background: var(--color-surface); border: 2px solid var(--color-warning); }
 
 /* Forms (Inputs, Selects) */
