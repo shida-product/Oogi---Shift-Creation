@@ -662,15 +662,15 @@ function renderOtherList() {
     const fullName = r.staff?.name || '不明';
     const lastName = fullName.split(/[\s　]+/)[0];
     
-    let typeLabel;
-    if (r.request_type === 'am') typeLabel = 'AM可';
-    else if (r.request_type === 'pm') typeLabel = 'PM可';
-    else if (r.request_type === 'dispense') typeLabel = '調剤';
-    else typeLabel = 'その他';
+    let typeLabel, itemCls;
+    if (r.request_type === 'am') { typeLabel = 'AM可'; itemCls = 'other-list__item--am'; }
+    else if (r.request_type === 'pm') { typeLabel = 'PM可'; itemCls = 'other-list__item--pm'; }
+    else if (r.request_type === 'dispense') { typeLabel = '調剤'; itemCls = 'other-list__item--dispense'; }
+    else { typeLabel = 'その他'; itemCls = 'other-list__item--other'; }
 
     const noteHtml = r.note ? `<span class="other-list__note">${escapeHtml(r.note)}</span>` : '';
 
-    html += `<div class="other-list__item other-list__item--clickable" data-staff-id="${r.staff_id}" data-date="${r.date}">
+    html += `<div class="other-list__item other-list__item--clickable ${itemCls}" data-staff-id="${r.staff_id}" data-date="${r.date}">
       <span class="other-list__date">${dateLabel}</span>
       <span class="other-list__staff">${escapeHtml(lastName)} ${typeLabel}</span>
       ${noteHtml}
