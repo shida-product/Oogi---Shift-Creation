@@ -670,7 +670,7 @@ function renderOtherList() {
 
     const noteHtml = r.note ? `<span class="other-list__note">${escapeHtml(r.note)}</span>` : '';
 
-    html += `<div class="other-list__item other-list__item--clickable ${itemCls}" data-staff-id="${r.staff_id}" data-date="${r.date}">
+    html += `<div class="other-list__item other-list__item--clickable ${itemCls}" data-staff-id="${r.staff_id}" data-date="${r.date}" data-type="${r.request_type}">
       <span class="other-list__date">${dateLabel}</span>
       <span class="other-list__staff">${escapeHtml(lastName)} ${typeLabel}</span>
       ${noteHtml}
@@ -681,11 +681,29 @@ function renderOtherList() {
   container.innerHTML = html;
   if (typeof lucide !== 'undefined') lucide.createIcons();
 
-  // 各アイテムクリックで編集モーダルを開く（グループ全体を渡す）
+  // 各アイテム操作（クリックでモーダル、ホバーでハイライト）
   container.querySelectorAll('.other-list__item--clickable').forEach(item => {
     item.addEventListener('click', () => {
       const groupDates = getGroupDates(item.dataset.staffId, item.dataset.date);
       openModal(item.dataset.staffId, groupDates);
+    });
+
+    item.addEventListener('mouseenter', () => {
+      const groupDates = getGroupDates(item.dataset.staffId, item.dataset.date);
+      const reqType = item.dataset.type;
+      groupDates.forEach(d => {
+        const cell = document.querySelector(`.day-cell[data-staff="${item.dataset.staffId}"][data-date="${d}"]`);
+        if (cell) cell.classList.add(`is-hover-${reqType}`);
+      });
+    });
+
+    item.addEventListener('mouseleave', () => {
+      const groupDates = getGroupDates(item.dataset.staffId, item.dataset.date);
+      const reqType = item.dataset.type;
+      groupDates.forEach(d => {
+        const cell = document.querySelector(`.day-cell[data-staff="${item.dataset.staffId}"][data-date="${d}"]`);
+        if (cell) cell.classList.remove(`is-hover-${reqType}`);
+      });
     });
   });
 }
