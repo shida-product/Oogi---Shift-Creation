@@ -31,6 +31,7 @@ const PATTERN_CSS = {
   '☆恵比寿': 'pattern-marker--part-ebisu',
   '☆渋谷': 'pattern-marker--part-shibuya',
   '午後☆渋谷': 'pattern-marker--pm-part-shibuya',
+  'りんご': 'pattern-marker--ringo',
 };
 
 // パターン→短縮ラベル
@@ -41,6 +42,7 @@ const PATTERN_LABEL = {
   '☆恵比寿': '恵',
   '☆渋谷': '渋',
   '午後☆渋谷': '午渋',
+  'りんご': 'りん',
 };
 
 // スタッフ別の使用可能パターン（staff_type + role で決定）
@@ -1503,7 +1505,7 @@ function renderGantt() {
 
       // 希望休チェック → 種類別ストライプクラス付与
       const request = state.requests.find(r => r.staff_id === staff.id && r.date === dateStr);
-      const STRIPE_MAP = { off: 'bg-stripe-off', am: 'bg-stripe-am', pm: 'bg-stripe-pm', dispense: 'bg-stripe-dispense', other: 'bg-stripe-other' };
+      const STRIPE_MAP = { off: 'bg-stripe-off', am: 'bg-stripe-am', pm: 'bg-stripe-pm', dispense: 'bg-stripe-dispense', ringo: 'bg-stripe-ringo', other: 'bg-stripe-other' };
 
       let cellContent = '';
       let cellClass = 'day-cell';
@@ -1563,9 +1565,10 @@ function renderGantt() {
     am: 'AM可（午前のみ出勤可）',
     pm: 'PM可（午後のみ出勤可）',
     dispense: '調剤（他薬局での調剤業務）',
+    ringo: 'りんご',
     other: 'その他の希望',
   };
-  const STRIPE_ICON = { off: '🔴', am: '🟢', pm: '🔵', dispense: '🟠', other: '🟡' };
+  const STRIPE_ICON = { off: '🔴', am: '🟢', pm: '🔵', dispense: '🟠', ringo: '', other: '🟡' };
   const tooltip = document.getElementById('stripe-tooltip');
   const tooltipType = document.getElementById('stripe-tooltip-type');
   const tooltipNote = document.getElementById('stripe-tooltip-note');

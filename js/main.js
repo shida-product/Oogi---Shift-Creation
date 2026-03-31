@@ -428,6 +428,7 @@ function renderGantt() {
           case 'am': cls = 'marker--am'; label = 'AM'; break;
           case 'pm': cls = 'marker--pm'; label = 'PM'; break;
           case 'dispense': cls = 'marker--dispense'; label = '調'; break;
+          case 'ringo': cls = 'marker--ringo'; label = 'り'; break;
           default: cls = 'marker--other'; label = '他'; break;
         }
         
@@ -490,6 +491,7 @@ function renderCalendar() {
       if (r.request_type === 'am') typeLabel = ' AM可';
       else if (r.request_type === 'pm') typeLabel = ' PM可';
       else if (r.request_type === 'dispense') typeLabel = ' 調剤';
+      else if (r.request_type === 'ringo') typeLabel = ' りんご';
       else if (r.request_type === 'other') typeLabel = ' その他';
 
       let isBarStart = false, isBarMiddle = false, isBarEnd = false;
@@ -563,6 +565,7 @@ function showDayDetail(dateStr) {
         case 'am':       type = 'AM可';    evtCls = 'cal-evt--am';       break;
         case 'pm':       type = 'PM可';    evtCls = 'cal-evt--pm';       break;
         case 'dispense': type = '調剤';    evtCls = 'cal-evt--dispense'; break;
+        case 'ringo':    type = 'りんご';  evtCls = 'cal-evt--ringo';    break;
         default:         type = 'その他';  evtCls = 'cal-evt--other';    break;
       }
       const note = r.note
@@ -666,6 +669,7 @@ function renderOtherList() {
     if (r.request_type === 'am') { typeLabel = 'AM可'; itemCls = 'other-list__item--am'; }
     else if (r.request_type === 'pm') { typeLabel = 'PM可'; itemCls = 'other-list__item--pm'; }
     else if (r.request_type === 'dispense') { typeLabel = '調剤'; itemCls = 'other-list__item--dispense'; }
+    else if (r.request_type === 'ringo') { typeLabel = 'りんご'; itemCls = 'other-list__item--ringo'; }
     else { typeLabel = 'その他'; itemCls = 'other-list__item--other'; }
 
     const noteHtml = r.note ? `<span class="other-list__note">${escapeHtml(r.note)}</span>` : '';
@@ -721,6 +725,18 @@ function updateDispenseVisibility(staffId) {
       labelDispense.style.display = 'none';
       const radio = document.querySelector('input[name="request-type"][value="dispense"]');
       if (radio && radio.checked) {
+        document.querySelector('input[name="request-type"][value="off"]').checked = true;
+      }
+    }
+  }
+  const labelRingo = document.getElementById('label-ringo');
+  if (labelRingo) {
+    if (staff && staff.name.includes('村上')) {
+      labelRingo.style.display = 'inline-flex';
+    } else {
+      labelRingo.style.display = 'none';
+      const radioRingo = document.querySelector('input[name="request-type"][value="ringo"]');
+      if (radioRingo && radioRingo.checked) {
         document.querySelector('input[name="request-type"][value="off"]').checked = true;
       }
     }

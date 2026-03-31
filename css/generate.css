@@ -286,6 +286,10 @@
 }
 
 /* 特別パターン（村上専用：出張/りんご等） */
+.pattern-marker--ringo {
+  background: #fee2e2;
+  color: #E73B3B;
+}
 .pattern-marker--special {
   background: var(--color-warning-bg);
   color: var(--color-warning);
@@ -367,6 +371,15 @@ tr.is-group-divider td {
     transparent 3px,
     rgba(139, 92, 246, 0.45) 3px,
     rgba(139, 92, 246, 0.45) 6px
+  ) !important;
+}
+.bg-stripe-ringo {
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 3px,
+    rgba(231, 59, 59, 0.35) 3px,
+    rgba(231, 59, 59, 0.35) 6px
   ) !important;
 }
 
