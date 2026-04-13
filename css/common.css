@@ -615,7 +615,7 @@ select.input-field,
 .other-list__item {
   display: flex;
   align-items: center;
-  flex: 1 1 300px; /* ベース幅300px。余白があれば伸び、足りなければカードごと改行 */
+  flex: 0 1 auto; /* 1件でも横幅いっぱいにならず、文字量に合わせる。画面幅を超える場合はガード */
   gap: 12px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
@@ -624,14 +624,15 @@ select.input-field,
   border-left: 4px solid var(--color-border);
   box-shadow: 0 1px 2px rgba(0,0,0,0.02);
   transition: all var(--transition-fast);
-  max-width: 100%; /* 画面幅を超える場合はガード */
+  max-width: 100%;
 }
 .other-list__item:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 .other-list__item--clickable { cursor: pointer; }
-.other-list__item--clickable:hover { background: var(--color-surface-hover); }
+.other-list__item--clickable:active { transform: translateY(0); box-shadow: var(--shadow-sm); }
+.other-list__item--clickable:hover { background: var(--color-surface-hover); border-color: var(--color-primary-bg); }
 .other-list__item--off      { border-left-color: var(--color-off); }
 .other-list__item--am       { border-left-color: var(--color-am); }
 .other-list__item--pm       { border-left-color: var(--color-pm); }
@@ -655,7 +656,17 @@ select.input-field,
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.other-list__edit-icon { width: 14px; height: 14px; color: var(--color-text-muted); flex-shrink: 0; }
+.other-list__edit-icon { 
+  width: 14px; 
+  height: 14px; 
+  color: var(--color-text-muted); 
+  flex-shrink: 0; 
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.other-list__item--clickable:hover .other-list__edit-icon {
+  opacity: 1;
+}
 
 /* リストからのホバーハイライト（ステータスカラー連動） */
 .gantt-table td.day-cell.is-hover-am { background: var(--color-am-bg) !important; box-shadow: inset 0 0 0 2px var(--color-am); z-index: 4; }
