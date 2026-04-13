@@ -98,38 +98,6 @@
   outline-offset: -2px;
 }
 
-/* リストからのホバーハイライト（ステータスカラー連動） */
-.gantt-table td.day-cell.is-hover-am {
-  background: var(--color-am-bg) !important;
-  box-shadow: inset 0 0 0 2px var(--color-am);
-  z-index: 4;
-}
-.gantt-table td.day-cell.is-hover-pm {
-  background: var(--color-pm-bg) !important;
-  box-shadow: inset 0 0 0 2px var(--color-pm);
-  z-index: 4;
-}
-.gantt-table td.day-cell.is-hover-dispense {
-  background: #fef0e0 !important;
-  box-shadow: inset 0 0 0 2px #e67e22;
-  z-index: 4;
-}
-.gantt-table td.day-cell.is-hover-other {
-  background: var(--color-other-bg) !important;
-  box-shadow: inset 0 0 0 2px var(--color-other);
-  z-index: 4;
-}
-.gantt-table td.day-cell.is-hover-ringo {
-  background: #fee2e2 !important;
-  box-shadow: inset 0 0 0 2px #E73B3B;
-  z-index: 4;
-}
-
-.gantt-table td.day-cell[class*="is-hover-"] .marker {
-  transform: scale(1.1);
-  box-shadow: var(--shadow-sm);
-}
-
 /* 希望マーカー（モダンなバッジ型） */
 .gantt-table td.day-cell .marker {
   display: flex;

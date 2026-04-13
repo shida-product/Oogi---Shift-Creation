@@ -380,12 +380,45 @@ function renderOtherList() {
     else { typeLabel = 'その他'; itemCls = 'other-list__item--other'; }
 
     const noteHtml = g.note ? `<span class="other-list__note">${g.note}</span>` : '';
-    return `<div class="other-list__item ${itemCls}">
+    return `<div class="other-list__item ${itemCls} other-list__item--clickable" data-staff="${g.staff_id}" data-start="${g.start_date}" data-end="${g.end_date}" data-type="${g.request_type}">
       <span class="other-list__date">${dateLabel}</span>
       <span class="other-list__staff">${staffName} ${typeLabel}</span>
       ${noteHtml}
     </div>`;
   }).join('');
+
+  // 各アイテムのホバーでガントをハイライト
+  listEl.querySelectorAll('.other-list__item').forEach(item => {
+    item.addEventListener('mouseenter', () => {
+      const staffId = item.dataset.staff;
+      const reqType = item.dataset.type;
+      const startDate = new Date(item.dataset.start + 'T00:00:00');
+      const endDate = new Date(item.dataset.end + 'T00:00:00');
+
+      let d = new Date(startDate);
+      while (d <= endDate) {
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const cell = document.querySelector(`.day-cell[data-staff="${staffId}"][data-date="${dateStr}"]`);
+        if (cell) cell.classList.add(`is-hover-${reqType}`);
+        d.setDate(d.getDate() + 1);
+      }
+    });
+
+    item.addEventListener('mouseleave', () => {
+      const staffId = item.dataset.staff;
+      const reqType = item.dataset.type;
+      const startDate = new Date(item.dataset.start + 'T00:00:00');
+      const endDate = new Date(item.dataset.end + 'T00:00:00');
+
+      let d = new Date(startDate);
+      while (d <= endDate) {
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const cell = document.querySelector(`.day-cell[data-staff="${staffId}"][data-date="${dateStr}"]`);
+        if (cell) cell.classList.remove(`is-hover-${reqType}`);
+        d.setDate(d.getDate() + 1);
+      }
+    });
+  });
 }
 
 // ============================================================

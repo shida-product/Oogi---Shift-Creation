@@ -607,17 +607,16 @@ select.input-field,
  * 条件付き・その他希望リスト（全ページ共通）
  * ============================================================ */
 .other-list__items {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
 }
 .other-list__item {
   display: flex;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  column-gap: 12px;
-  row-gap: 8px;
+  align-items: center;
+  flex: 1 1 300px; /* ベース幅300px。余白があれば伸び、足りなければカードごと改行 */
+  gap: 12px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
@@ -625,6 +624,7 @@ select.input-field,
   border-left: 4px solid var(--color-border);
   box-shadow: 0 1px 2px rgba(0,0,0,0.02);
   transition: all var(--transition-fast);
+  max-width: 100%; /* 画面幅を超える場合はガード */
 }
 .other-list__item:hover {
   transform: translateY(-2px);
@@ -642,17 +642,25 @@ select.input-field,
 .other-list__date {
   font-weight: 700;
   color: var(--color-text-secondary);
-  flex-shrink: 0;
+  white-space: nowrap;
 }
 .other-list__staff {
   font-weight: 700;
-  flex-shrink: 0;
+  white-space: nowrap;
 }
 .other-list__note {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
-  flex: 1 1 auto;
-  min-width: 120px;
-  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .other-list__edit-icon { width: 14px; height: 14px; color: var(--color-text-muted); flex-shrink: 0; }
+
+/* リストからのホバーハイライト（ステータスカラー連動） */
+.gantt-table td.day-cell.is-hover-am { background: var(--color-am-bg) !important; box-shadow: inset 0 0 0 2px var(--color-am); z-index: 4; }
+.gantt-table td.day-cell.is-hover-pm { background: var(--color-pm-bg) !important; box-shadow: inset 0 0 0 2px var(--color-pm); z-index: 4; }
+.gantt-table td.day-cell.is-hover-dispense { background: #fef0e0 !important; box-shadow: inset 0 0 0 2px #e67e22; z-index: 4; }
+.gantt-table td.day-cell.is-hover-other { background: var(--color-other-bg) !important; box-shadow: inset 0 0 0 2px var(--color-other); z-index: 4; }
+.gantt-table td.day-cell.is-hover-ringo { background: #fee2e2 !important; box-shadow: inset 0 0 0 2px #E73B3B; z-index: 4; }
+.gantt-table td.day-cell[class*="is-hover-"] .marker { transform: scale(1.1); box-shadow: var(--shadow-sm); }
