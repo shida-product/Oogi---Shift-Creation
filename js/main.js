@@ -448,6 +448,70 @@ function renderGantt() {
 }
 
 // ============================================================
+// カレンダーレーン割り当て（Google Calendar 方式）
+// 各スタッフの連続ブロックに「行番号(レーン)」を固定で割り当てる。
+// 開始日が先のブロックから順にグリーディに最初の空きレーンを確保し、
+// その期間中は常に同じ行に表示されることを保証する。
+// ============================================================
+function buildCalendarLanes() {
+  // 1. スタッフ×連続日付のセグメントを抽出（タイプ問わず連続していれば1セグメント）
+  const segments = [];
+  state.staffList.forEach(staff => {
+    const dates = state.requests
+      .filter(r => r.staff_id === staff.id)
+      .map(r => r.date)
+      .sort();
+    if (dates.length === 0) return;
+
+    let seg = { staffId: staff.id, start: dates[0], end: dates[0] };
+    for (let i = 1; i < dates.length; i++) {
+      const next = new Date(seg.end + 'T00:00:00');
+      next.setDate(next.getDate() + 1);
+      if (formatDate(next) === dates[i]) {
+        seg.end = dates[i]; // 連続している → セグメント延長
+      } else {
+        segments.push({ ...seg });
+        seg = { staffId: staff.id, start: dates[i], end: dates[i] };
+      }
+    }
+    segments.push(seg);
+  });
+
+  // 2. 開始日昇順、同日なら終了日が遅い（長い）方を優先
+  segments.sort((a, b) => {
+    if (a.start !== b.start) return a.start.localeCompare(b.start);
+    return b.end.localeCompare(a.end);
+  });
+
+  // 3. グリーディにレーン割り当て
+  // lanes[i] = そのレーンが最後に使われた endDate
+  const lanes = [];
+  const segmentLanes = new Map(); // `${staffId}_${start}` → laneIndex
+  segments.forEach(seg => {
+    let lane = lanes.findIndex(endDate => endDate < seg.start);
+    if (lane === -1) lane = lanes.length; // 空きなし → 新レーン追加
+    lanes[lane] = seg.end;
+    segmentLanes.set(`${seg.staffId}_${seg.start}`, lane);
+  });
+
+  // 4. 日付×staffId → laneIndex マップを構築
+  const dateLaneMap = new Map(); // dateStr → Map<staffId, laneIndex>
+  segments.forEach(seg => {
+    const lane = segmentLanes.get(`${seg.staffId}_${seg.start}`);
+    const d = new Date(seg.start + 'T00:00:00');
+    const endD = new Date(seg.end + 'T00:00:00');
+    while (d <= endD) {
+      const ds = formatDate(d);
+      if (!dateLaneMap.has(ds)) dateLaneMap.set(ds, new Map());
+      dateLaneMap.get(ds).set(seg.staffId, lane);
+      d.setDate(d.getDate() + 1);
+    }
+  });
+
+  return dateLaneMap;
+}
+
+// ============================================================
 // カレンダー描画（スマホ）- Google Calendar 風
 // ============================================================
 function renderCalendar() {
@@ -458,7 +522,11 @@ function renderCalendar() {
   const todayStr = formatDate(today);
   const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
 
+  // レーン割り当てを事前に計算（全期間分）
+  const laneMap = buildCalendarLanes();
+
   let html = '';
+
   dayNames.forEach((name, i) => {
     const cls = i === 0 ? 'is-sunday' : i === 6 ? 'is-saturday' : '';
     html += `<div class="calendar-grid__header ${cls}">${name}</div>`;
@@ -477,9 +545,10 @@ function renderCalendar() {
     if (dow === 6) classes.push('is-saturday');
     if (isHoliday) classes.push('is-holiday');
 
+    // レーンマップを参照してソート（各スタッフは期間中同じ行に固定される）
     const dayReqs = state.requests
       .filter(r => r.date === dateStr)
-      .sort((a, b) => getGroupDates(b.staff_id, b.date).length - getGroupDates(a.staff_id, a.date).length);
+      .sort((a, b) => (laneMap.get(dateStr)?.get(a.staff_id) ?? 999) - (laneMap.get(dateStr)?.get(b.staff_id) ?? 999));
     let eventsHtml = '';
     dayReqs.forEach(r => {
       const { bg, text } = getStaffColor(r.staff_id);
