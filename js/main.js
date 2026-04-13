@@ -486,16 +486,26 @@ function buildCalendarLanes() {
   // 3. グリーディにレーン割り当て
   // lanes[i] = そのレーンが最後に使われた endDate
   const lanes = [];
-  const segmentLanes = new Map(); // `${staffId}_${start}` → laneIndex
+  // 3. 空いている一番上のレーンを割り当て（グリーディ）
+  const lanes = []; // lanes[i] = そのレーンが空く日（最後に使われたendDate）
+  const segmentLanes = new Map(); // `${staffId}_${start}` -> laneIndex
   segments.forEach(seg => {
-    let lane = lanes.findIndex(endDate => endDate < seg.start);
-    if (lane === -1) lane = lanes.length; // 空きなし → 新レーン追加
-    lanes[lane] = seg.end;
-    segmentLanes.set(`${seg.staffId}_${seg.start}`, lane);
+    let assignedLane = -1;
+    for (let i = 0; i < lanes.length; i++) {
+      if (lanes[i] < seg.start) {
+        assignedLane = i;
+        break;
+      }
+    }
+    if (assignedLane === -1) {
+      assignedLane = lanes.length; // 空きがなければ新しいレーンを追加
+    }
+    lanes[assignedLane] = seg.end;
+    segmentLanes.set(`${seg.staffId}_${seg.start}`, assignedLane);
   });
 
-  // 4. 日付×staffId → laneIndex マップを構築
-  const dateLaneMap = new Map(); // dateStr → Map<staffId, laneIndex>
+  // 4. dateStr → staffId → laneIndex のマッピングに変換
+  const dateLaneMap = new Map();
   segments.forEach(seg => {
     const lane = segmentLanes.get(`${seg.staffId}_${seg.start}`);
     const d = new Date(seg.start + 'T00:00:00');
@@ -515,77 +525,99 @@ function buildCalendarLanes() {
 // カレンダー描画（スマホ）- Google Calendar 風
 // ============================================================
 function renderCalendar() {
-  const grid = document.getElementById('calendar-grid');
-  const daysInMonth = new Date(state.currentYear, state.currentMonth + 1, 0).getDate();
-  const firstDow = new Date(state.currentYear, state.currentMonth, 1).getDay();
-  const today = new Date();
-  const todayStr = formatDate(today);
-  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+  const wrapper = document.querySelector('.calendar-wrapper');
+  if (!wrapper) return;
 
-  // レーン割り当てを事前に計算（全期間分）
   const laneMap = buildCalendarLanes();
 
-  let html = '';
+  // 月の日付リストを生成（カレンダーは前後の月の余白日も含む）
+  const todayStr = formatDate(new Date());
+  
+  // 今月の1日
+  const firstDay = new Date(state.currentYear, state.currentMonth, 1);
+  const lastDay = new Date(state.currentYear, state.currentMonth + 1, 0);
+  
+  // 開始曜日分戻る（日曜始まりならgetDay()分戻る）
+  const startDate = new Date(firstDay);
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+  
+  // 終了曜日分進む（合計6週=42日分確保）
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + 41);
 
-  dayNames.forEach((name, i) => {
-    const cls = i === 0 ? 'is-sunday' : i === 6 ? 'is-saturday' : '';
-    html += `<div class="calendar-grid__header ${cls}">${name}</div>`;
-  });
+  const grid = document.querySelector('.calendar-grid');
+  let html = `<div class="calendar-grid__header is-sunday">日</div>
+              <div class="calendar-grid__header">月</div>
+              <div class="calendar-grid__header">火</div>
+              <div class="calendar-grid__header">水</div>
+              <div class="calendar-grid__header">木</div>
+              <div class="calendar-grid__header">金</div>
+              <div class="calendar-grid__header is-saturday">土</div>`;
 
-  for (let i = 0; i < firstDow; i++) html += '<div class="calendar-grid__cell is-empty"></div>';
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dt = new Date(state.currentYear, state.currentMonth, d);
+  let dt = new Date(startDate);
+  while (dt <= endDate) {
     const dateStr = formatDate(dt);
+    const m = dt.getMonth();
+    const d = dt.getDate();
     const dow = dt.getDay();
-    const isHoliday = state.holidays[dateStr];
+
+    const isCurrentMonth = (m === state.currentMonth);
+    const isHoliday = !!state.holidays[dateStr];
+
     const classes = ['calendar-grid__cell'];
-    if (dateStr === todayStr) classes.push('is-today');
+    if (!isCurrentMonth) classes.push('is-empty');
     if (dow === 0) classes.push('is-sunday');
     if (dow === 6) classes.push('is-saturday');
     if (isHoliday) classes.push('is-holiday');
 
-    // レーンマップを参照してソート（各スタッフは期間中同じ行に固定される）
-    const dayReqs = state.requests
-      .filter(r => r.date === dateStr)
-      .sort((a, b) => (laneMap.get(dateStr)?.get(a.staff_id) ?? 999) - (laneMap.get(dateStr)?.get(b.staff_id) ?? 999));
+    // 該当日のレーン情報とリクエストを取得
+    const dayLaneMap = laneMap.get(dateStr) || new Map();
+    const dayReqs = state.requests.filter(r => r.date === dateStr);
+    const maxLane = dayReqs.length > 0
+      ? Math.max(...dayReqs.map(r => dayLaneMap.get(r.staff_id) ?? 0))
+      : -1;
+
     let eventsHtml = '';
-    dayReqs.forEach(r => {
-      const { bg, text } = getStaffColor(r.staff_id);
+    const prevDateObj = new Date(dt); prevDateObj.setDate(prevDateObj.getDate() - 1);
+    const prevDateStr = formatDate(prevDateObj);
+    const nextDateObj = new Date(dt); nextDateObj.setDate(nextDateObj.getDate() + 1);
+    const nextDateStr = formatDate(nextDateObj);
+
+    // 最大レーン番号までループ（空きレーンにはスペーサーを入れる）
+    for (let currentLane = 0; currentLane <= maxLane; currentLane++) {
+      const reqsInThisLane = dayReqs.filter(r => (dayLaneMap.get(r.staff_id) ?? 0) === currentLane);
       
-      const fullName = r.staff?.name || '?';
-      const lastName = fullName.split(/[\s　]+/)[0];
+      if (reqsInThisLane.length === 0) {
+        // 誰もいない場合は透明スペーサーを配置し、高さを潰さないように &nbsp; を入れる
+        eventsHtml += '<span class="cal-evt cal-evt--spacer">&nbsp;</span>';
+        continue;
+      }
 
-      let typeLabel = '';
-      if (r.request_type === 'am') typeLabel = ' AM可';
-      else if (r.request_type === 'pm') typeLabel = ' PM可';
-      else if (r.request_type === 'dispense') typeLabel = ' 調剤';
-      else if (r.request_type === 'ringo') typeLabel = ' りんご';
-      else if (r.request_type === 'other') typeLabel = ' その他';
+      // 同じ人・同じレーンに複数の希望（AM・PMなど）がある場合はすべて描画する
+      reqsInThisLane.forEach(r => {
+        const { bg, text } = getStaffColor(r.staff_id);
+        const fullName = r.staff?.name || '?';
+        const lastName = fullName.split(/[\s　]+/)[0];
 
-      let isBarStart = false, isBarMiddle = false, isBarEnd = false;
-      const prevDateObj = new Date(dt); prevDateObj.setDate(prevDateObj.getDate() - 1);
-      const prevDateStr = formatDate(prevDateObj);
-      const nextDateObj = new Date(dt); nextDateObj.setDate(nextDateObj.getDate() + 1);
-      const nextDateStr = formatDate(nextDateObj);
+        let typeLabel = '';
+        if (r.request_type === 'am') typeLabel = ' AM可';
+        else if (r.request_type === 'pm') typeLabel = ' PM可';
+        else if (r.request_type === 'dispense') typeLabel = ' 調剤';
+        else if (r.request_type === 'ringo') typeLabel = ' りんご';
+        else if (r.request_type === 'other') typeLabel = ' その他';
 
-      const prevReq = state.requests.find(pr => pr.staff_id === r.staff_id && pr.date === prevDateStr);
-      const nextReq = state.requests.find(nr => nr.staff_id === r.staff_id && nr.date === nextDateStr);
+        // 前後日と繋がっているか判定し、バーの角丸・表示を調整
+        const prevReq = state.requests.find(pr => pr.staff_id === r.staff_id && pr.date === prevDateStr && pr.request_type === r.request_type && pr.note === r.note);
+        const nextReq = state.requests.find(nr => nr.staff_id === r.staff_id && nr.date === nextDateStr && nr.request_type === r.request_type && nr.note === r.note);
 
-      const hasPrev = prevReq && prevReq.request_type === r.request_type && prevReq.note === r.note;
-      const hasNext = nextReq && nextReq.request_type === r.request_type && nextReq.note === r.note;
+        let extraCls = '';
+        if (!prevReq && nextReq) extraCls = ' is-bar-start';
+        else if (prevReq && nextReq) extraCls = ' is-bar-middle';
+        else if (prevReq && !nextReq) extraCls = ' is-bar-end';
 
-      if (!hasPrev && hasNext) isBarStart = true;
-      if (hasPrev && hasNext) isBarMiddle = true;
-      if (hasPrev && !hasNext) isBarEnd = true;
-
-      let extraCls = '';
-      if (isBarStart) extraCls = ' is-bar-start';
-      else if (isBarMiddle) extraCls = ' is-bar-middle';
-      else if (isBarEnd) extraCls = ' is-bar-end';
-
-      eventsHtml += `<span class="cal-evt${extraCls}" style="background:${bg};color:${text};">${escapeHtml(lastName + typeLabel)}</span>`;
-    });
+        eventsHtml += `<span class="cal-evt${extraCls}" style="background:${bg};color:${text};">${escapeHtml(lastName + typeLabel)}</span>`;
+      });
+    }
 
     html += `<div class="${classes.join(' ')}" data-date="${dateStr}">
       <div class="cal-date"><span class="cal-date__num${dateStr === todayStr ? ' cal-date__num--today' : ''}">${d}</span></div>

@@ -370,6 +370,8 @@
 .cal-evt--dispense { background: #fef0e0;                color: #e67e22;            }
 .cal-evt--ringo    { background: #fee2e2;                color: #E73B3B;            }
 .cal-evt--more     { background: var(--color-surface-2); color: var(--color-text-muted); text-align: center; }
+/* 空きレーンのスペーサー：高さを確保して下の行がずれないようにする */
+.cal-evt--spacer   { background: transparent; pointer-events: none; visibility: hidden; }
 
 /* 複数日バー表示用スタイル（スマホ） */
 .calendar-grid__cell .cal-evt.is-bar-start {
