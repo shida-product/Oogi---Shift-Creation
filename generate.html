@@ -26,8 +26,9 @@
 
     <div class="month-nav" style="margin: 0 auto;">
       <button class="month-nav__btn" id="prev-month" aria-label="前月" type="button"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i></button>
-      <span class="month-nav__label" id="month-label"></span>
+      <span class="month-nav__label" id="month-label" title="クリックして月を選択" style="cursor: pointer; user-select: none;"></span>
       <button class="month-nav__btn" id="next-month" aria-label="次月" type="button"><i data-lucide="chevron-right" style="width:18px;height:18px;"></i></button>
+      <button class="month-nav__today-btn" id="today-month-btn" title="今月に戻る" style="display:none;">今月へ戻る</button>
     </div>
 
     <nav class="app-header__nav">
@@ -102,6 +103,21 @@
       <div class="cell-editor__options" id="cell-editor-options"></div>
     </div>
   </main>
+
+  <!-- 月選択モーダル -->
+  <div class="month-picker-overlay" id="month-picker-overlay" style="display:none;">
+    <div class="month-picker-modal" id="month-picker-modal">
+      <div class="month-picker__header">
+        <button class="month-picker__year-btn" id="picker-prev-year">&#8249;</button>
+        <span class="month-picker__year" id="picker-year-label"></span>
+        <button class="month-picker__year-btn" id="picker-next-year">&#8250;</button>
+      </div>
+      <div class="month-picker__grid" id="picker-month-grid"></div>
+      <div class="month-picker__footer">
+        <button class="btn btn--outline btn--sm" id="picker-cancel">キャンセル</button>
+      </div>
+    </div>
+  </div>
 
   <!-- トースト -->
   <div class="toast-container" id="toast-container"></div>

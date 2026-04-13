@@ -200,6 +200,21 @@ document.addEventListener('DOMContentLoaded', async () => {
 function bindEvents() {
   document.getElementById('prev-month').addEventListener('click', () => changeMonth(-1));
   document.getElementById('next-month').addEventListener('click', () => changeMonth(1));
+  document.getElementById('today-month-btn').addEventListener('click', () => {
+    const now = new Date();
+    state.currentYear = now.getFullYear();
+    state.currentMonth = now.getMonth();
+    state.holidays = { ...getHolidays(state.currentYear), ...getHolidays(state.currentYear + 1) };
+    renderMonth();
+    loadExistingAssignments();
+  });
+  document.getElementById('month-label').addEventListener('click', openMonthPicker);
+  document.getElementById('picker-cancel').addEventListener('click', closeMonthPicker);
+  document.getElementById('month-picker-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeMonthPicker();
+  });
+  document.getElementById('picker-prev-year').addEventListener('click', () => { pickerYear--; renderMonthPickerGrid(); });
+  document.getElementById('picker-next-year').addEventListener('click', () => { pickerYear++; renderMonthPickerGrid(); });
   document.getElementById('btn-generate').addEventListener('click', handleGenerate);
   document.getElementById('btn-csv').addEventListener('click', handleCSVExport);
   document.getElementById('btn-undo').addEventListener('click', handleUndo);
@@ -213,6 +228,39 @@ function bindEvents() {
     }
   });
   setupGanttHover();
+}
+
+// ============================================================
+// 月選択モーダル（カスタム実装）
+// ============================================================
+let pickerYear = new Date().getFullYear();
+const MONTH_LABELS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+function openMonthPicker() {
+  pickerYear = state.currentYear;
+  renderMonthPickerGrid();
+  document.getElementById('month-picker-overlay').style.display = 'flex';
+}
+function closeMonthPicker() {
+  document.getElementById('month-picker-overlay').style.display = 'none';
+}
+function renderMonthPickerGrid() {
+  document.getElementById('picker-year-label').textContent = `${pickerYear}年`;
+  const grid = document.getElementById('picker-month-grid');
+  grid.innerHTML = MONTH_LABELS.map((label, i) => {
+    const isCurrent = (pickerYear === state.currentYear && i === state.currentMonth);
+    return `<button class="month-picker__month-btn${isCurrent ? ' is-current' : ''}" data-month="${i}">${label}</button>`;
+  }).join('');
+  grid.querySelectorAll('.month-picker__month-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.currentYear = pickerYear;
+      state.currentMonth = parseInt(btn.dataset.month, 10);
+      state.holidays = { ...getHolidays(state.currentYear), ...getHolidays(state.currentYear + 1) };
+      renderMonth();
+      loadExistingAssignments();
+      closeMonthPicker();
+    });
+  });
 }
 
 // ============================================================
@@ -262,6 +310,9 @@ function changeMonth(delta) {
 
 function renderMonth() {
   document.getElementById('month-label').textContent = `${state.currentYear}年 ${state.currentMonth + 1}月`;
+  const now = new Date();
+  const isCurrentMonth = (state.currentYear === now.getFullYear() && state.currentMonth === now.getMonth());
+  document.getElementById('today-month-btn').style.display = isCurrentMonth ? 'none' : 'inline-block';
 }
 
 // ============================================================
