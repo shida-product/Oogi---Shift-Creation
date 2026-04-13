@@ -762,33 +762,64 @@ function renderOtherList() {
   const startStr = formatDate(startDateObj);
   const endStr = formatDate(endDateObj);
 
-  const otherReqs = state.requests
-    .filter(r => r.request_type !== 'off' && r.date >= startStr && r.date <= endStr)
-    .sort((a, b) => a.date.localeCompare(b.date));
+  const filteredReqs = state.requests
+    .filter(r => (r.request_type !== 'off' || (r.request_type === 'off' && r.note)) && r.date >= startStr && r.date <= endStr)
+    .sort((a, b) => {
+      if (a.staff_id !== b.staff_id) return a.staff_id.localeCompare(b.staff_id);
+      return a.date.localeCompare(b.date);
+    });
 
-  if (otherReqs.length === 0) {
+  // 連続する日程をグループ化
+  const groupedReqs = [];
+  filteredReqs.forEach(r => {
+    const lastGroup = groupedReqs.length > 0 ? groupedReqs[groupedReqs.length - 1] : null;
+    
+    if (lastGroup 
+        && lastGroup.staff_id === r.staff_id 
+        && lastGroup.request_type === r.request_type 
+        && lastGroup.note === r.note) {
+      // 連続する日付かどうかのチェック
+      const nextDateStr = formatDate(new Date(new Date(lastGroup.end_date + 'T00:00:00').getTime() + 86400000));
+      if (r.date === nextDateStr) {
+        lastGroup.end_date = r.date; // 期間を延長
+        return;
+      }
+    }
+    groupedReqs.push({ ...r, start_date: r.date, end_date: r.date });
+  });
+
+  // 表示用に開始日順にソート
+  groupedReqs.sort((a, b) => a.start_date.localeCompare(b.start_date));
+
+  if (groupedReqs.length === 0) {
     container.innerHTML = '';
     return;
   }
 
-  let html = `<div class="other-list__title">条件付き・その他の希望 <span class="other-list__count">${otherReqs.length}件</span></div>`;
+  let html = `<div class="other-list__title">条件付き・その他の希望 <span class="other-list__count">${groupedReqs.length}件</span></div>`;
   html += '<div class="other-list__items">';
-  otherReqs.forEach(r => {
-    const dt = new Date(r.date + 'T00:00:00');
-    const dateLabel = `${dt.getMonth() + 1}/${dt.getDate()}（${dayNames[dt.getDay()]}）`;
-    const fullName = r.staff?.name || '不明';
+  groupedReqs.forEach(g => {
+    const startDt = new Date(g.start_date + 'T00:00:00');
+    const endDt = new Date(g.end_date + 'T00:00:00');
+    let dateLabel = `${startDt.getMonth() + 1}/${startDt.getDate()}（${dayNames[startDt.getDay()]}）`;
+    if (g.start_date !== g.end_date) {
+      dateLabel += `〜${endDt.getMonth() + 1}/${endDt.getDate()}（${dayNames[endDt.getDay()]}）`;
+    }
+
+    const fullName = g.staff?.name || '不明';
     const lastName = fullName.split(/[\s　]+/)[0];
     
     let typeLabel, itemCls;
-    if (r.request_type === 'am') { typeLabel = 'AM可'; itemCls = 'other-list__item--am'; }
-    else if (r.request_type === 'pm') { typeLabel = 'PM可'; itemCls = 'other-list__item--pm'; }
-    else if (r.request_type === 'dispense') { typeLabel = '調剤'; itemCls = 'other-list__item--dispense'; }
-    else if (r.request_type === 'ringo') { typeLabel = 'りんご'; itemCls = 'other-list__item--ringo'; }
+    if (g.request_type === 'am') { typeLabel = 'AM可'; itemCls = 'other-list__item--am'; }
+    else if (g.request_type === 'pm') { typeLabel = 'PM可'; itemCls = 'other-list__item--pm'; }
+    else if (g.request_type === 'dispense') { typeLabel = '調剤'; itemCls = 'other-list__item--dispense'; }
+    else if (g.request_type === 'ringo') { typeLabel = 'りんご'; itemCls = 'other-list__item--ringo'; }
+    else if (g.request_type === 'off') { typeLabel = '休み'; itemCls = 'other-list__item--off'; }
     else { typeLabel = 'その他'; itemCls = 'other-list__item--other'; }
 
-    const noteHtml = r.note ? `<span class="other-list__note">${escapeHtml(r.note)}</span>` : '';
+    const noteHtml = g.note ? `<span class="other-list__note">${escapeHtml(g.note)}</span>` : '';
 
-    html += `<div class="other-list__item other-list__item--clickable ${itemCls}" data-staff-id="${r.staff_id}" data-date="${r.date}" data-type="${r.request_type}">
+    html += `<div class="other-list__item other-list__item--clickable ${itemCls}" data-staff-id="${g.staff_id}" data-date="${g.start_date}" data-type="${g.request_type}">
       <span class="other-list__date">${dateLabel}</span>
       <span class="other-list__staff">${escapeHtml(lastName)} ${typeLabel}</span>
       ${noteHtml}

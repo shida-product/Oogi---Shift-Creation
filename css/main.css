@@ -594,6 +594,7 @@
   box-shadow: var(--shadow-sm);
   transition: all var(--transition-fast);
 }
+.other-list__item--off { border-left: 4px solid var(--color-off); }
 .other-list__item--am { border-left: 4px solid var(--color-am); }
 .other-list__item--pm { border-left: 4px solid var(--color-pm); }
 .other-list__item--dispense { border-left: 4px solid #e67e22; }
