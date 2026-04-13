@@ -614,8 +614,10 @@ select.input-field,
 }
 .other-list__item {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  column-gap: 12px;
+  row-gap: 8px;
   padding: 12px 14px;
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
@@ -636,7 +638,21 @@ select.input-field,
 .other-list__item--dispense { border-left-color: #e67e22; }
 .other-list__item--ringo    { border-left-color: #E73B3B; }
 .other-list__item--other    { border-left-color: var(--color-other); }
-.other-list__date  { font-weight: 700; color: var(--color-text-secondary); white-space: nowrap; min-width: 80px; }
-.other-list__staff { font-weight: 700; min-width: 60px; }
-.other-list__note  { font-size: var(--font-size-xs); color: var(--color-text-muted); flex: 1; }
+
+.other-list__date {
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+.other-list__staff {
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.other-list__note {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  flex: 1 1 auto;
+  min-width: 120px;
+  line-height: 1.5;
+}
 .other-list__edit-icon { width: 14px; height: 14px; color: var(--color-text-muted); flex-shrink: 0; }
