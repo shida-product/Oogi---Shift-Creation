@@ -863,21 +863,35 @@ tr.is-group-divider td {
 .other-reqs-accordion__header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   padding: 14px 20px;
   cursor: pointer;
   user-select: none;
+  border-radius: var(--radius-lg);
   transition: background var(--transition-fast);
 }
 .other-reqs-accordion__header:hover {
-  background: var(--color-surface-2);
+  background: var(--color-surface-hover, #f8f9fa);
+}
+
+.other-reqs-accordion__title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--color-warning-bg) 0%, rgba(245, 158, 11, 0.06) 100%);
+  color: var(--color-warning, #d97706);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  flex-shrink: 0;
 }
 
 .other-reqs-accordion__title {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-base, 1rem);
   font-weight: 700;
-  flex: 1;
-  letter-spacing: 0.02em;
+  color: var(--color-text);
+  letter-spacing: 0.03em;
 }
 
 .other-reqs-accordion__count {
