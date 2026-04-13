@@ -621,6 +621,7 @@ function renderCalendar() {
       <div class="cal-date"><span class="cal-date__num${dateStr === todayStr ? ' cal-date__num--today' : ''}">${d}</span></div>
       <div class="cal-events">${eventsHtml}</div>
     </div>`;
+    dt.setDate(dt.getDate() + 1);
   }
   grid.innerHTML = html;
 
