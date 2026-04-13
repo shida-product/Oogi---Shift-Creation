@@ -632,6 +632,7 @@
   font-weight: 700;
   min-width: 80px;
   color: var(--color-text-secondary);
+  white-space: nowrap;
 }
 
 .other-list__staff {

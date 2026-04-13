@@ -792,7 +792,7 @@ function renderOtherList() {
   groupedReqs.sort((a, b) => a.start_date.localeCompare(b.start_date));
 
   if (groupedReqs.length === 0) {
-    container.innerHTML = '';
+    container.innerHTML = `<div class="other-list__title">条件付き・その他の希望 <span class="other-list__count">0件</span></div>`;
     return;
   }
 
