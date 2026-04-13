@@ -846,6 +846,9 @@ tr.is-group-divider td {
 #btn-reset:disabled,
 #btn-csv:disabled {
   opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 
 /* ---------- 条件付き希望リスト（アコーディオン） ---------- */
 .other-reqs-accordion {
