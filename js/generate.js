@@ -228,6 +228,11 @@ function bindEvents() {
     }
   });
   setupGanttHover();
+
+  // 条件付き希望アコーディオンのトグル
+  document.getElementById('other-reqs-header').addEventListener('click', () => {
+    document.getElementById('other-reqs-accordion').classList.toggle('is-open');
+  });
 }
 
 // ============================================================
@@ -316,6 +321,74 @@ function renderMonth() {
 }
 
 // ============================================================
+// 条件付き・その他希望リスト描画（アコーディオン）
+// ============================================================
+function renderOtherList() {
+  const accordion = document.getElementById('other-reqs-accordion');
+  const listEl = document.getElementById('other-reqs-list');
+  const countEl = document.getElementById('other-reqs-count');
+  if (!accordion || !listEl) return;
+
+  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+
+  // 対象フィルタ：休み（備考あり）+ 条件付き全種
+  const filtered = state.requests
+    .filter(r => r.request_type !== 'off' || (r.request_type === 'off' && r.note))
+    .sort((a, b) => {
+      if (a.staff_id !== b.staff_id) return a.staff_id.localeCompare(b.staff_id);
+      return a.date.localeCompare(b.date);
+    });
+
+  // 連続日付グループ化
+  const grouped = [];
+  filtered.forEach(r => {
+    const last = grouped.length > 0 ? grouped[grouped.length - 1] : null;
+    if (last && last.staff_id === r.staff_id && last.request_type === r.request_type && last.note === r.note) {
+      const nextDate = new Date(new Date(last.end_date + 'T00:00:00').getTime() + 86400000);
+      const nextStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth()+1).padStart(2,'0')}-${String(nextDate.getDate()).padStart(2,'0')}`;
+      if (r.date === nextStr) { last.end_date = r.date; return; }
+    }
+    grouped.push({ ...r, start_date: r.date, end_date: r.date });
+  });
+  grouped.sort((a, b) => a.start_date.localeCompare(b.start_date));
+
+  countEl.textContent = `${grouped.length}件`;
+  accordion.style.display = '';
+
+  if (grouped.length === 0) {
+    listEl.innerHTML = '<p style="font-size:var(--font-size-sm);color:var(--color-text-muted);padding:8px 0;">条件付き希望はありません</p>';
+    return;
+  }
+
+  listEl.innerHTML = grouped.map(g => {
+    const staff = state.staffList.find(s => s.id === g.staff_id);
+    const staffName = staff?.name?.split(/[\s　]+/)[0] || '?';
+
+    const startDt = new Date(g.start_date + 'T00:00:00');
+    const endDt = new Date(g.end_date + 'T00:00:00');
+    let dateLabel = `${startDt.getMonth()+1}/${startDt.getDate()}（${dayNames[startDt.getDay()]}）`;
+    if (g.start_date !== g.end_date) {
+      dateLabel += `〜${endDt.getMonth()+1}/${endDt.getDate()}（${dayNames[endDt.getDay()]}）`;
+    }
+
+    let typeLabel, itemCls;
+    if (g.request_type === 'am') { typeLabel = 'AM可'; itemCls = 'other-list__item--am'; }
+    else if (g.request_type === 'pm') { typeLabel = 'PM可'; itemCls = 'other-list__item--pm'; }
+    else if (g.request_type === 'dispense') { typeLabel = '調剤'; itemCls = 'other-list__item--dispense'; }
+    else if (g.request_type === 'ringo') { typeLabel = 'りんご'; itemCls = 'other-list__item--ringo'; }
+    else if (g.request_type === 'off') { typeLabel = '休み'; itemCls = 'other-list__item--off'; }
+    else { typeLabel = 'その他'; itemCls = 'other-list__item--other'; }
+
+    const noteHtml = g.note ? `<span class="other-list__note">${g.note}</span>` : '';
+    return `<div class="other-list__item ${itemCls}">
+      <span class="other-list__date">${dateLabel}</span>
+      <span class="other-list__staff">${staffName} ${typeLabel}</span>
+      ${noteHtml}
+    </div>`;
+  }).join('');
+}
+
+// ============================================================
 // データ取得
 // ============================================================
 async function loadData() {
@@ -364,6 +437,7 @@ async function loadExistingAssignments() {
     document.getElementById('btn-csv').disabled = false;
     renderGantt();
     renderConditionsCheck();
+    renderOtherList();
 
     // 初期状態を保存（リセット・Undo用）
     state.baselineAssignments = cloneAssignments(state.assignments);
@@ -377,6 +451,7 @@ async function loadExistingAssignments() {
     document.getElementById('gantt-placeholder').style.display = 'flex';
     const condPanel = document.getElementById('conditions-panel');
     if (condPanel) condPanel.style.display = 'none';
+    renderOtherList(); // 月変更時にも条件付き一覧を更新
 
     state.baselineAssignments = null;
     state.history = [];

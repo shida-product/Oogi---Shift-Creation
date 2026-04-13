@@ -840,6 +840,7 @@ tr.is-group-divider td {
   transform: scale(1.05);
 }
 
+
 #btn-undo:disabled,
 #btn-redo:disabled,
 #btn-reset:disabled,
@@ -848,3 +849,88 @@ tr.is-group-divider td {
   cursor: not-allowed;
   pointer-events: none;
 }
+
+/* ---------- 条件付き希望リスト（アコーディオン） ---------- */
+.other-reqs-accordion {
+  margin-top: 20px;
+  background: var(--color-surface);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  overflow: hidden;
+}
+
+.other-reqs-accordion__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--transition-fast);
+}
+.other-reqs-accordion__header:hover {
+  background: var(--color-surface-2);
+}
+
+.other-reqs-accordion__title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  flex: 1;
+  letter-spacing: 0.02em;
+}
+
+.other-reqs-accordion__count {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-bg);
+  color: var(--color-primary-text);
+}
+
+.other-reqs-accordion__chevron {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-muted);
+  transition: transform var(--transition-fast);
+}
+.other-reqs-accordion.is-open .other-reqs-accordion__chevron {
+  transform: rotate(180deg);
+}
+
+.other-reqs-accordion__body {
+  display: none;
+  padding: 0 16px 16px;
+  border-top: 1px solid var(--color-border);
+}
+.other-reqs-accordion.is-open .other-reqs-accordion__body {
+  display: block;
+}
+
+/* アイテムの行（main.jsのother-listと同じ構造を流用） */
+.other-list__items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.other-list__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  background: var(--color-surface-2);
+  border-left: 4px solid var(--color-border);
+}
+.other-list__item--off      { border-left-color: var(--color-off); }
+.other-list__item--am       { border-left-color: var(--color-am); }
+.other-list__item--pm       { border-left-color: var(--color-pm); }
+.other-list__item--dispense { border-left-color: #e67e22; }
+.other-list__item--ringo    { border-left-color: #E73B3B; }
+.other-list__item--other    { border-left-color: var(--color-other); }
+.other-list__date  { font-weight: 700; color: var(--color-text-secondary); white-space: nowrap; min-width: 80px; }
+.other-list__staff { font-weight: 700; min-width: 60px; }
+.other-list__note  { font-size: var(--font-size-xs); color: var(--color-text-muted); flex: 1; }

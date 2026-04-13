@@ -87,6 +87,19 @@
       </table>
     </div>
 
+    <!-- 条件付き・その他希望リスト（アコーディオン） -->
+    <div class="other-reqs-accordion" id="other-reqs-accordion" style="display:none;">
+      <div class="other-reqs-accordion__header" id="other-reqs-header">
+        <i data-lucide="message-square-warning" style="width:18px;height:18px;color:var(--color-warning);flex-shrink:0;"></i>
+        <span class="other-reqs-accordion__title">条件付き・その他の希望</span>
+        <span class="other-reqs-accordion__count" id="other-reqs-count">0件</span>
+        <svg class="other-reqs-accordion__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="other-reqs-accordion__body">
+        <div class="other-list__items" id="other-reqs-list"></div>
+      </div>
+    </div>
+
     <!-- 条件チェックパネル -->
     <div class="card-surface conditions-panel" id="conditions-panel" style="display:none;" role="region" aria-labelledby="conditions-heading">
       <div class="conditions-panel__title" id="conditions-heading">
