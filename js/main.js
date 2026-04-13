@@ -752,8 +752,18 @@ function updateFabVisibility() {
 function renderOtherList() {
   const container = document.getElementById('other-list');
   const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+  const firstDay = new Date(state.currentYear, state.currentMonth, 1);
+  const lastDay = new Date(state.currentYear, state.currentMonth + 1, 0);
+  const startDateObj = new Date(firstDay);
+  startDateObj.setDate(startDateObj.getDate() - startDateObj.getDay());
+  const endDateObj = new Date(lastDay);
+  endDateObj.setDate(endDateObj.getDate() + (6 - endDateObj.getDay()));
+  
+  const startStr = formatDate(startDateObj);
+  const endStr = formatDate(endDateObj);
+
   const otherReqs = state.requests
-    .filter(r => r.request_type !== 'off')
+    .filter(r => r.request_type !== 'off' && r.date >= startStr && r.date <= endStr)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   if (otherReqs.length === 0) {
