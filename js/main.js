@@ -148,20 +148,21 @@ function bindEvents() {
   document.getElementById('prev-month').addEventListener('click', () => changeMonth(-1));
   document.getElementById('next-month').addEventListener('click', () => changeMonth(1));
 
-  const monthPicker = document.getElementById('month-picker');
-  if (monthPicker) {
-    monthPicker.addEventListener('change', (e) => {
-      if (!e.target.value) return;
-      const parts = e.target.value.split('-');
-      if (parts.length === 2) {
-        state.currentYear = parseInt(parts[0], 10);
-        state.currentMonth = parseInt(parts[1], 10) - 1;
-        updateHolidays();
-        renderMonth();
-        loadRequests();
-      }
-    });
-  }
+  // 月ラベルをクリックすると月選択モーダルを開く
+  document.getElementById('month-label').addEventListener('click', openMonthPicker);
+  document.getElementById('picker-cancel').addEventListener('click', closeMonthPicker);
+  document.getElementById('month-picker-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeMonthPicker();
+  });
+  document.getElementById('picker-prev-year').addEventListener('click', () => {
+    pickerYear--;
+    renderMonthPickerGrid();
+  });
+  document.getElementById('picker-next-year').addEventListener('click', () => {
+    pickerYear++;
+    renderMonthPickerGrid();
+  });
+
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('modal-overlay').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeModal();
@@ -185,6 +186,43 @@ function bindEvents() {
 
   setupGanttDrag();
   setupGanttHover();
+}
+
+// ============================================================
+// 月選択モーダル（カスタム実装）
+// ============================================================
+let pickerYear = new Date().getFullYear();
+
+const MONTH_LABELS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+function openMonthPicker() {
+  pickerYear = state.currentYear;
+  renderMonthPickerGrid();
+  document.getElementById('month-picker-overlay').style.display = 'flex';
+}
+
+function closeMonthPicker() {
+  document.getElementById('month-picker-overlay').style.display = 'none';
+}
+
+function renderMonthPickerGrid() {
+  document.getElementById('picker-year-label').textContent = `${pickerYear}年`;
+  const grid = document.getElementById('picker-month-grid');
+  grid.innerHTML = MONTH_LABELS.map((label, i) => {
+    const isCurrent = (pickerYear === state.currentYear && i === state.currentMonth);
+    return `<button class="month-picker__month-btn${isCurrent ? ' is-current' : ''}" data-month="${i}">${label}</button>`;
+  }).join('');
+
+  grid.querySelectorAll('.month-picker__month-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.currentYear = pickerYear;
+      state.currentMonth = parseInt(btn.dataset.month, 10);
+      updateHolidays();
+      renderMonth();
+      loadRequests();
+      closeMonthPicker();
+    });
+  });
 }
 
 // ============================================================

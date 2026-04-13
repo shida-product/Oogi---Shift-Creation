@@ -25,10 +25,7 @@
 
     <div class="month-nav" style="margin: 0 auto;">
       <button class="month-nav__btn" id="prev-month" aria-label="前月"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i></button>
-      <div style="position: relative; display: inline-flex; align-items: center; justify-content: center;">
-        <span class="month-nav__label" id="month-label"></span>
-        <input type="month" id="month-picker" style="position: absolute; opacity: 0; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;">
-      </div>
+      <span class="month-nav__label" id="month-label" title="クリックして月を選択" style="cursor: pointer; user-select: none;"></span>
       <button class="month-nav__btn" id="next-month" aria-label="次月"><i data-lucide="chevron-right" style="width:18px;height:18px;"></i></button>
     </div>
 
@@ -161,6 +158,21 @@
   <button class="fab" id="fab-add" aria-label="今日の希望を登録" style="display:none;">
     <i data-lucide="plus" style="width:24px;height:24px;"></i>
   </button>
+
+  <!-- 月選択モーダル -->
+  <div class="month-picker-overlay" id="month-picker-overlay" style="display:none;">
+    <div class="month-picker-modal" id="month-picker-modal">
+      <div class="month-picker__header">
+        <button class="month-picker__year-btn" id="picker-prev-year">&#8249;</button>
+        <span class="month-picker__year" id="picker-year-label"></span>
+        <button class="month-picker__year-btn" id="picker-next-year">&#8250;</button>
+      </div>
+      <div class="month-picker__grid" id="picker-month-grid"></div>
+      <div class="month-picker__footer">
+        <button class="btn btn--outline btn--sm" id="picker-cancel">キャンセル</button>
+      </div>
+    </div>
+  </div>
 
   <!-- トースト -->
   <div class="toast-container" id="toast-container"></div>
