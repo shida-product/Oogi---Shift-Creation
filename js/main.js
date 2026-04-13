@@ -535,17 +535,17 @@ function renderCalendar() {
   // 月の日付リストを生成（カレンダーは前後の月の余白日も含む）
   const todayStr = formatDate(new Date());
   
-  // 今月の1日
+  // 今月の1日と末日
   const firstDay = new Date(state.currentYear, state.currentMonth, 1);
   const lastDay = new Date(state.currentYear, state.currentMonth + 1, 0);
   
-  // 開始曜日分戻る（日曜始まりならgetDay()分戻る）
+  // 開始日：今月1日の週の日曜日
   const startDate = new Date(firstDay);
   startDate.setDate(startDate.getDate() - startDate.getDay());
   
-  // 終了曜日分進む（合計6週=42日分確保）
-  const endDate = new Date(startDate);
-  endDate.setDate(endDate.getDate() + 41);
+  // 終了日：今月末日の週の土曜日
+  const endDate = new Date(lastDay);
+  endDate.setDate(endDate.getDate() + (6 - endDate.getDay()));
 
   const grid = document.querySelector('.calendar-grid');
   let html = `<div class="calendar-grid__header is-sunday">日</div>
