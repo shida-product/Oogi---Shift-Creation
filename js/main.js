@@ -483,9 +483,7 @@ function buildCalendarLanes() {
     return b.end.localeCompare(a.end);
   });
 
-  // 3. グリーディにレーン割り当て
-  // lanes[i] = そのレーンが最後に使われた endDate
-  const lanes = [];
+
   // 3. 空いている一番上のレーンを割り当て（グリーディ）
   const lanes = []; // lanes[i] = そのレーンが空く日（最後に使われたendDate）
   const segmentLanes = new Map(); // `${staffId}_${start}` -> laneIndex
