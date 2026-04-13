@@ -147,6 +147,14 @@ function updateHolidays() {
 function bindEvents() {
   document.getElementById('prev-month').addEventListener('click', () => changeMonth(-1));
   document.getElementById('next-month').addEventListener('click', () => changeMonth(1));
+  document.getElementById('today-month-btn').addEventListener('click', () => {
+    const now = new Date();
+    state.currentYear = now.getFullYear();
+    state.currentMonth = now.getMonth();
+    updateHolidays();
+    renderMonth();
+    loadRequests();
+  });
 
   // 月ラベルをクリックすると月選択モーダルを開く
   document.getElementById('month-label').addEventListener('click', openMonthPicker);
@@ -395,10 +403,11 @@ function changeMonth(delta) {
 
 function renderMonth() {
   document.getElementById('month-label').textContent = `${state.currentYear}年 ${state.currentMonth + 1}月`;
-  const monthPicker = document.getElementById('month-picker');
-  if (monthPicker) {
-    monthPicker.value = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
-  }
+
+  // 「今月」ボタン：当月以外を表示中のときだけ表示する
+  const now = new Date();
+  const isCurrentMonth = (state.currentYear === now.getFullYear() && state.currentMonth === now.getMonth());
+  document.getElementById('today-month-btn').style.display = isCurrentMonth ? 'none' : 'inline-block';
 }
 
 
