@@ -148,8 +148,20 @@ function bindEvents() {
   document.getElementById('prev-month').addEventListener('click', () => changeMonth(-1));
   document.getElementById('next-month').addEventListener('click', () => changeMonth(1));
 
-
-
+  const monthPicker = document.getElementById('month-picker');
+  if (monthPicker) {
+    monthPicker.addEventListener('change', (e) => {
+      if (!e.target.value) return;
+      const parts = e.target.value.split('-');
+      if (parts.length === 2) {
+        state.currentYear = parseInt(parts[0], 10);
+        state.currentMonth = parseInt(parts[1], 10) - 1;
+        updateHolidays();
+        renderMonth();
+        loadRequests();
+      }
+    });
+  }
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('modal-overlay').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeModal();
@@ -345,6 +357,10 @@ function changeMonth(delta) {
 
 function renderMonth() {
   document.getElementById('month-label').textContent = `${state.currentYear}年 ${state.currentMonth + 1}月`;
+  const monthPicker = document.getElementById('month-picker');
+  if (monthPicker) {
+    monthPicker.value = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+  }
 }
 
 

@@ -25,7 +25,10 @@
 
     <div class="month-nav" style="margin: 0 auto;">
       <button class="month-nav__btn" id="prev-month" aria-label="前月"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i></button>
-      <span class="month-nav__label" id="month-label"></span>
+      <div style="position: relative; display: inline-flex; align-items: center; justify-content: center;">
+        <span class="month-nav__label" id="month-label"></span>
+        <input type="month" id="month-picker" style="position: absolute; opacity: 0; top: 0; left: 0; width: 100%; height: 100%; cursor: pointer;">
+      </div>
       <button class="month-nav__btn" id="next-month" aria-label="次月"><i data-lucide="chevron-right" style="width:18px;height:18px;"></i></button>
     </div>
 
