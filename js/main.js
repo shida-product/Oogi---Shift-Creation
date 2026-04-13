@@ -309,8 +309,12 @@ async function loadStaffList() {
 }
 
 async function loadRequests() {
-  const startDate = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}-01`;
-  const endDate = getLastDayOfMonth(state.currentYear, state.currentMonth);
+  // カレンダー表示時に月跨ぎのデータ（前月の余白や角丸の繋ぎ目判定）を正しく行うため、
+  // 当月だけでなく前後1ヶ月分（合計3ヶ月分）をまとめて取得する
+  const startDateObj = new Date(state.currentYear, state.currentMonth - 1, 1);
+  const endDateObj = new Date(state.currentYear, state.currentMonth + 2, 0);
+  const startDate = formatDate(startDateObj);
+  const endDate = formatDate(endDateObj);
 
   const { data, error } = await supabase
     .from('shift_requests')
@@ -625,7 +629,7 @@ function renderCalendar() {
   }
   grid.innerHTML = html;
 
-  grid.querySelectorAll('.calendar-grid__cell:not(.is-empty)').forEach(cell => {
+  grid.querySelectorAll('.calendar-grid__cell').forEach(cell => {
     cell.addEventListener('click', () => showDayDetail(cell.dataset.date));
   });
 }
