@@ -1985,8 +1985,16 @@ function handleCSVExport() {
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const assign = state.assignments.find(a => a.staff_id === staff.id && a.date === dateStr);
-      const attendance = assign?.attendance_type || '平日';
+      let attendance = assign?.attendance_type || '平日';
       const pattern = assign?.work_pattern || '';
+
+      // CSV出力時のみ、希望休（off）以外の「所定休日」を「平日」に書き換える
+      if (attendance === '所定休日') {
+        const isOffRequest = state.requests.some(r => r.staff_id === staff.id && r.date === dateStr && r.request_type === 'off');
+        if (!isOffRequest) {
+          attendance = '平日';
+        }
+      }
 
       // 日付フォーマット: YYYY/M/D
       const csvDate = `${year}/${month}/${d}`;
