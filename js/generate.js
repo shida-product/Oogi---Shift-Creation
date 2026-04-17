@@ -1988,10 +1988,10 @@ function handleCSVExport() {
       let attendance = assign?.attendance_type || '平日';
       const pattern = assign?.work_pattern || '';
 
-      // CSV出力時のみ、希望休（off）以外の「所定休日」を「平日」に書き換える
+      // CSV出力時のみ、「AM可」「PM可」「りんご」以外の希望が出ている日は全て「所定休日」として扱う
       if (attendance === '所定休日') {
-        const isOffRequest = state.requests.some(r => r.staff_id === staff.id && r.date === dateStr && r.request_type === 'off');
-        if (!isOffRequest) {
+        const isHolidayRequest = state.requests.some(r => r.staff_id === staff.id && r.date === dateStr && !['am', 'pm', 'ringo'].includes(r.request_type));
+        if (!isHolidayRequest) {
           attendance = '平日';
         }
       }
