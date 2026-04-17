@@ -432,10 +432,21 @@ tr.is-group-divider td {
   font-weight: 700;
 }
 
+.gantt-table tfoot .count-warn {
+  color: #d97706;
+  font-weight: 700;
+}
+
 /* フッター：薬2/事2以上のNG（赤セル） */
 .gantt-table tfoot td.cell-ng {
   background: var(--color-danger-bg) !important;
   color: var(--color-danger);
+}
+
+/* フッター：半分出勤（0.5）などの警告（黄色セル） */
+.gantt-table tfoot td.cell-warn {
+  background: #fef3c7 !important;
+  color: #b45309;
 }
 
 /* ---------- セル編集ドロップダウン ---------- */

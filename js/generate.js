@@ -1329,7 +1329,7 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
 
     const assignedOfficeToday = new Set();
 
-    function tryAssignOffice(candidates, dateStr, pattern, isOverflow = false) {
+    function tryAssignOffice(candidates, dateStr, pattern, isOverflow = false, passType = 'full') {
       const store = pattern === PATTERNS.PART_EBISU ? 'ebisu' : 'shibuya';
       const currentDay = new Date(dateStr + 'T00:00:00').getDate();
       const progress = currentDay / daysInMonth; // 月の進捗率 (0〜1)
@@ -1369,35 +1369,35 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
         return getScore(b) - getScore(a);
       });
 
-      for (const staff of sorted) {
-        if (manualSet.has(`${staff.id}_${dateStr}`)) continue;
-        if (assignedOfficeToday.has(staff.id)) continue;
-        if (!canWork(staff.id, dateStr)) continue;
-        if (!checkPartConditions(staff, dateStr, isOverflow)) continue;
-        addAssignment(staff.id, dateStr, '平日', pattern);
-        assignedOfficeToday.add(staff.id);
-        return true;
-      }
-
-      // === 第2パス: 半日フォールバック ===
-      // フルタイムで出勤できる要員が全員不在の場合のみ、AM可/PM可スタッフを半日で割り当てる
-      for (const staff of sorted) {
-        if (manualSet.has(`${staff.id}_${dateStr}`)) continue;
-        if (assignedOfficeToday.has(staff.id)) continue;
-        const req = requestMap[`${staff.id}_${dateStr}`];
-        if (!req || (req.request_type !== 'am' && req.request_type !== 'pm')) continue;
-        if (!canWorkHalfDay(staff.id, dateStr)) continue;
-        if (!checkPartConditions(staff, dateStr, isOverflow)) continue;
-        // AM可→午前パターン、PM可→午後パターン を店舗に合わせて選択
-        let halfPattern;
-        if (store === 'ebisu') {
-          halfPattern = req.request_type === 'am' ? PATTERNS.AM_PART_EBISU : PATTERNS.PM_PART_EBISU;
-        } else {
-          halfPattern = req.request_type === 'am' ? PATTERNS.AM_PART_SHIBUYA : PATTERNS.PM_PART_SHIBUYA;
+      if (passType === 'full') {
+        for (const staff of sorted) {
+          if (manualSet.has(`${staff.id}_${dateStr}`)) continue;
+          if (assignedOfficeToday.has(staff.id)) continue;
+          if (!canWork(staff.id, dateStr)) continue;
+          if (!checkPartConditions(staff, dateStr, isOverflow)) continue;
+          addAssignment(staff.id, dateStr, '平日', pattern);
+          assignedOfficeToday.add(staff.id);
+          return true;
         }
-        addAssignment(staff.id, dateStr, '平日', halfPattern);
-        assignedOfficeToday.add(staff.id);
-        return true;
+      } else if (passType === 'half') {
+        for (const staff of sorted) {
+          if (manualSet.has(`${staff.id}_${dateStr}`)) continue;
+          if (assignedOfficeToday.has(staff.id)) continue;
+          const req = requestMap[`${staff.id}_${dateStr}`];
+          if (!req || (req.request_type !== 'am' && req.request_type !== 'pm')) continue;
+          if (!canWorkHalfDay(staff.id, dateStr)) continue;
+          if (!checkPartConditions(staff, dateStr, isOverflow)) continue;
+
+          let halfPattern;
+          if (store === 'ebisu') {
+            halfPattern = req.request_type === 'am' ? PATTERNS.AM_PART_EBISU : PATTERNS.PM_PART_EBISU;
+          } else {
+            halfPattern = req.request_type === 'am' ? PATTERNS.AM_PART_SHIBUYA : PATTERNS.PM_PART_SHIBUYA;
+          }
+          addAssignment(staff.id, dateStr, '平日', halfPattern);
+          assignedOfficeToday.add(staff.id);
+          return true;
+        }
       }
       return false;
     }
@@ -1905,35 +1905,43 @@ function renderGanttFooter(daysInMonth, sortedStaff) {
       const staff = state.staffList.find(s => s.id === a.staff_id);
       if (!staff) return;
       const isPharm = staff.role === 'pharmacist';
-      if ([PATTERNS.EMPLOYEE_EBISU, PATTERNS.PART_EBISU].includes(a.work_pattern)) {
-        if (isPharm) ep++; else eo++;
-      }
-      if ([PATTERNS.EMPLOYEE_SHIBUYA, PATTERNS.PART_SHIBUYA, PATTERNS.PM_PART_SHIBUYA].includes(a.work_pattern)) {
-        if (isPharm) sp++; else so++;
-      }
+
+      const isFullEbisu = [PATTERNS.EMPLOYEE_EBISU, PATTERNS.PART_EBISU].includes(a.work_pattern);
+      const isHalfEbisu = [PATTERNS.AM_PART_EBISU, PATTERNS.PM_PART_EBISU].includes(a.work_pattern);
+      if (isFullEbisu) { if (isPharm) ep += 1; else eo += 1; }
+      else if (isHalfEbisu) { if (isPharm) ep += 0.5; else eo += 0.5; }
+
+      const isFullShibuya = [PATTERNS.EMPLOYEE_SHIBUYA, PATTERNS.PART_SHIBUYA, PATTERNS.DEV].includes(a.work_pattern);
+      const isHalfShibuya = [PATTERNS.AM_PART_SHIBUYA, PATTERNS.PM_PART_SHIBUYA].includes(a.work_pattern);
+      if (isFullShibuya) { if (isPharm) sp += 1; else so += 1; }
+      else if (isHalfShibuya) { if (isPharm) sp += 0.5; else so += 0.5; }
     });
 
     if (isSunday) {
       ebisuRow += '<td style="background:var(--color-surface-2);font-size:0.75rem;color:var(--color-text-muted);">休</td>';
+      shibuyaRow += '<td style="background:var(--color-surface-2);font-size:0.75rem;color:var(--color-text-muted);">休</td>';
     } else {
-      // 恵比寿：薬1/事1が正常、それ以外（0またはは2以上）はNG
-      const eOk = ep === 1 && eo === 1;
-      const epNg = ep !== 1;
-      const eoNg = eo !== 1;
-      const eCellNg = !eOk ? ' cell-ng' : '';
-      const epStr = epNg ? `<span class="count-ng">薬${ep}</span>` : `薬${ep}`;
-      const eoStr = eoNg ? `<span class="count-ng">事${eo}</span>` : `事${eo}`;
-      ebisuRow += `<td class="${eCellNg.trim()}">${epStr}/${eoStr}</td>`;
-    }
+      function getStatusClass(p, o) {
+        if (p === 1 && o === 1) return '';
+        // 薬か事務のどちらかが0.5で、かつ0や2以上（NG）がない場合は「警告（黄色）」にする
+        const hasHalf = p === 0.5 || o === 0.5;
+        const hasZeroOrExceed = p === 0 || o === 0 || p > 1 || o > 1;
+        if (hasHalf && !hasZeroOrExceed) return ' cell-warn';
+        return ' cell-ng'; // 全く足りない、または多すぎる場合は赤
+      }
 
-    // 渋谷：薬1/事1のみOK（薬2・事2以上も過剰でNG）
-    const sOk = sp === 1 && so === 1;
-    const spNg = sp !== 1;
-    const soNg = so !== 1;
-    const sCellNg = !sOk ? ' cell-ng' : '';
-    const spStr = spNg ? `<span class="count-ng">薬${sp}</span>` : `薬${sp}`;
-    const soStr = soNg ? `<span class="count-ng">事${so}</span>` : `事${so}`;
-    shibuyaRow += `<td class="${sCellNg.trim()}">${spStr}/${soStr}</td>`;
+      function getSpan(val, role) {
+        if (val === 1) return `${role}${val}`;
+        if (val === 0.5) return `<span class="count-warn">${role}0.5</span>`;
+        return `<span class="count-ng">${role}${val}</span>`;
+      }
+
+      const eCellClass = getStatusClass(ep, eo);
+      ebisuRow += `<td class="${eCellClass.trim()}">${getSpan(ep, '薬')}/${getSpan(eo, '事')}</td>`;
+
+      const sCellClass = getStatusClass(sp, so);
+      shibuyaRow += `<td class="${sCellClass.trim()}">${getSpan(sp, '薬')}/${getSpan(so, '事')}</td>`;
+    }
   }
 
   const eSummary = '<td class="gantt-summary-col"></td>';
