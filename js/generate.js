@@ -80,7 +80,7 @@ const PATTERN_LABEL = {
   '☆恵比寿': '恵',
   '☆渋谷': '渋',
   '午後☆渋谷': 'PM',
-  'りんご': 'りん',
+  'りんご': 'り',
   // 半日パターン（AM可/PM可→ガント表示は「AM」「PM」, 色は店舗のフルカラー）
   '午前☆恵比寿': 'AM',
   '午後☆恵比寿': 'PM',
@@ -1437,7 +1437,8 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
       } else {
         const req = requestMap[`${murakami.id}_${dateStr}`];
         const isHolidayReq = req && !CSV_WEEKDAY_REQUEST_TYPES.includes(req.request_type);
-        addAssignment(murakami.id, dateStr, isHolidayReq ? '所定休日' : '平日', '');
+        const ringoPattern = (req && req.request_type === 'ringo') ? 'りんご' : '';
+        addAssignment(murakami.id, dateStr, isHolidayReq ? '所定休日' : '平日', ringoPattern);
       }
 
       // 最終充足チェック → 警告

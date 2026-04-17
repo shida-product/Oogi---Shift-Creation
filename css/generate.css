@@ -301,10 +301,9 @@
   color: var(--color-text-muted);
 }
 
-/* 特別パターン（村上専用：出張/りんご等） */
 .pattern-marker--ringo {
-  background: #fee2e2;
-  color: #E73B3B;
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
 }
 .pattern-marker--special {
   background: var(--color-warning-bg);
