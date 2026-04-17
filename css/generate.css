@@ -265,12 +265,28 @@
   color: #fff;
 }
 
-/* ━━ 渋谷（ピンク系）━━ */
+/* ━━ 渋谷（フルタイム、ピンク系）━━ */
 .pattern-marker--employee-shibuya,
-.pattern-marker--part-shibuya,
-.pattern-marker--pm-part-shibuya {
+.pattern-marker--part-shibuya {
   background: #E879A8;
   color: #fff;
+}
+
+/* ━━ 半日出勤（AM可/PM可対応）：薄色＋内側ダッシュ枠で区別━━ */
+.pattern-marker--pm-part-shibuya,
+.pattern-marker--am-part-shibuya {
+  background: #D4689A;
+  color: #fff;
+  outline: 2px dashed rgba(255,255,255,0.5);
+  outline-offset: -4px;
+}
+
+.pattern-marker--am-part-ebisu,
+.pattern-marker--pm-part-ebisu {
+  background: #6880D0;
+  color: #fff;
+  outline: 2px dashed rgba(255,255,255,0.5);
+  outline-offset: -4px;
 }
 
 /* 開発 */

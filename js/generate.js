@@ -50,6 +50,11 @@ const PATTERNS = {
   PART_EBISU: '☆恵比寿',
   PART_SHIBUYA: '☆渋谷',
   PM_PART_SHIBUYA: '午後☆渋谷',
+  // 半日出勤パターン（AM可/PM可でフルタイム代替不在時に自動投入）
+  AM_PART_EBISU:   '午前☆恵比寿',
+  PM_PART_EBISU:   '午後☆恵比寿',
+  AM_PART_SHIBUYA: '午前☆渋谷',
+  // PM_PART_SHIBUYAの '午後☆渋谷' をPM渋谷半日にそのまま流用
 };
 
 // パターン→CSSクラスのマッピング
@@ -61,6 +66,10 @@ const PATTERN_CSS = {
   '☆渋谷': 'pattern-marker--part-shibuya',
   '午後☆渋谷': 'pattern-marker--pm-part-shibuya',
   'りんご': 'pattern-marker--ringo',
+  // 半日パターン
+  '午前☆恵比寿': 'pattern-marker--am-part-ebisu',
+  '午後☆恵比寿': 'pattern-marker--pm-part-ebisu',
+  '午前☆渋谷':   'pattern-marker--am-part-shibuya',
 };
 
 // パターン→短縮ラベル
@@ -72,6 +81,10 @@ const PATTERN_LABEL = {
   '☆渋谷': '渋',
   '午後☆渋谷': '午渋',
   'りんご': 'りん',
+  // 半日パターン
+  '午前☆恵比寿': '午前恵',
+  '午後☆恵比寿': '午後恵',
+  '午前☆渋谷':   '午前渋',
 };
 
 // スタッフ別の使用可能パターン（staff_type + role で決定）
@@ -89,7 +102,7 @@ function getAvailablePatterns(staff) {
     return ['', '☆恵比寿', '☆渋谷'];
   }
   if (staff.staff_type === 'part_time' && staff.role === 'office') {
-    return ['', '☆恵比寿', '☆渋谷', '午後☆渋谷'];
+    return ['', '☆恵比寿', '☆渋谷', '午後☆渋谷', '午前☆恵比寿', '午後☆恵比寿', '午前☆渋谷'];
   }
   return [''];
 }
@@ -990,9 +1003,10 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
     // 手動オーバーライドがあればスキップ
     if (manualSet.has(`${staffId}_${dateStr}`)) return false;
 
-    // 希望休/調剤チェック
+    // 希望休/調剤/AM可/PM可チェック
+    // AM可・PM可は「出勤拒否ではないが丸1日出勤はできない」扱いのため、シフトには入れない
     const req = requestMap[`${staffId}_${dateStr}`];
-    if (req && (req.request_type === 'off' || req.request_type === 'dispense')) return false;
+    if (req && (req.request_type === 'off' || req.request_type === 'dispense' || req.request_type === 'am' || req.request_type === 'pm')) return false;
 
     // 連勤チェック（基本は最大5連勤、DB設定があれば上書き）
     const staff = state.staffList.find(s => s.id === staffId);
@@ -1059,6 +1073,28 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
       }
     }
 
+    return true;
+  }
+
+  // AM可・PM可スタッフ専用の出勤可否チェック（off/dispense のみブロック、am/pm は通過させる）
+  function canWorkHalfDay(staffId, dateStr) {
+    if (manualSet.has(`${staffId}_${dateStr}`)) return false;
+    const req = requestMap[`${staffId}_${dateStr}`];
+    // off・dispense のみブロック（am/pm はここではブロックしない）
+    if (req && (req.request_type === 'off' || req.request_type === 'dispense')) return false;
+    // 連勤チェック（通常の canWork と同じロジック）
+    const staff = state.staffList.find(s => s.id === staffId);
+    let maxConsecutive = staff?.work_conditions?.max_consecutive_days || 5;
+    if (staff?.work_conditions?.alternating_weeks) {
+      maxConsecutive = Math.min(maxConsecutive, Math.max(...staff.work_conditions.alternating_weeks));
+    }
+    const wc = workCounts[staffId];
+    if (wc.lastWorkedDate) {
+      const last = new Date(wc.lastWorkedDate + 'T00:00:00');
+      const curr = new Date(dateStr + 'T00:00:00');
+      const diff = (curr - last) / (1000 * 60 * 60 * 24);
+      if (diff === 1 && wc.consecutiveDays >= maxConsecutive) return false;
+    }
     return true;
   }
 
@@ -1227,7 +1263,10 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
       if (shouldWork) {
         addAssignment(tokunaga.id, dateStr, '平日', tokunagaPattern);
       } else {
-        addAssignment(tokunaga.id, dateStr, '所定休日', '');
+        // AM可・PM可の日は「平日（勤務なし）」として記録（所定休日にしない）
+        const tokReq = requestMap[`${tokunaga.id}_${dateStr}`];
+        const isAmPm = tokReq && (tokReq.request_type === 'am' || tokReq.request_type === 'pm');
+        addAssignment(tokunaga.id, dateStr, isAmPm ? '平日' : '所定休日', '');
       }
     }
 
@@ -1301,6 +1340,27 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
         assignedOfficeToday.add(staff.id);
         return true;
       }
+
+      // === 第2パス: 半日フォールバック ===
+      // フルタイムで出勤できる要員が全員不在の場合のみ、AM可/PM可スタッフを半日で割り当てる
+      for (const staff of sorted) {
+        if (manualSet.has(`${staff.id}_${dateStr}`)) continue;
+        if (assignedOfficeToday.has(staff.id)) continue;
+        const req = requestMap[`${staff.id}_${dateStr}`];
+        if (!req || (req.request_type !== 'am' && req.request_type !== 'pm')) continue;
+        if (!canWorkHalfDay(staff.id, dateStr)) continue;
+        if (!checkPartConditions(staff, dateStr, isOverflow)) continue;
+        // AM可→午前パターン、PM可→午後パターン を店舗に合わせて選択
+        let halfPattern;
+        if (store === 'ebisu') {
+          halfPattern = req.request_type === 'am' ? PATTERNS.AM_PART_EBISU : PATTERNS.PM_PART_EBISU;
+        } else {
+          halfPattern = req.request_type === 'am' ? PATTERNS.AM_PART_SHIBUYA : PATTERNS.PM_PART_SHIBUYA;
+        }
+        addAssignment(staff.id, dateStr, '平日', halfPattern);
+        assignedOfficeToday.add(staff.id);
+        return true;
+      }
       return false;
     }
 
@@ -1329,11 +1389,14 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
     }
 
     // 未配置の事務パートは休日
+    // ただし AM可・PM可で外れた日は「平日（勤務なし）」として記録（所定休日にしない）
     for (const staff of officeStaff) {
       if (manualSet.has(`${staff.id}_${dateStr}`)) continue;
       if (assignedOfficeToday.has(staff.id)) continue;
       if (!result.find(a => a.staff_id === staff.id && a.date === dateStr)) {
-        addAssignment(staff.id, dateStr, '所定休日', '');
+        const officeReq = requestMap[`${staff.id}_${dateStr}`];
+        const isAmPm = officeReq && (officeReq.request_type === 'am' || officeReq.request_type === 'pm');
+        addAssignment(staff.id, dateStr, isAmPm ? '平日' : '所定休日', '');
       }
     }
 
@@ -1972,7 +2035,11 @@ function getComputedPatternColor(pattern) {
     '◯開発': '#fdcb6e',
     '☆恵比寿': '#a29bfe',
     '☆渋谷': '#74b9ff',
-    '午後☆渋谷': '#74b9ff',
+    '午後☆渋谷': '#D4689A',
+    // 半日パターン
+    '午前☆恵比寿': '#6880D0',
+    '午後☆恵比寿': '#6880D0',
+    '午前☆渋谷':   '#D4689A',
   };
   return colors[pattern] || '#ccc';
 }
