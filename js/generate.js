@@ -1342,27 +1342,29 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
           const priority = staff.store_priority?.[store] ?? 99;
           const actual = workCounts[staff.id].total;
 
+          // スコアの階層（Tier）を確実にするためのベーススコア
+          // Tier 1: 目標未達成のレギュラースタッフ (Base: 20000)
+          // Tier 2: 目標なしの穴埋めスタッフ (Base: 10000)
+          // Tier 3: 目標達成済みのレギュラースタッフ (Base: 0)
+
           if (target === 0) {
             // 目標なし（本庄さんなど）は穴埋め要員
-            // レギュラーが全員目標達成済みの時だけ出番が来る
-            return 50 - priority;
+            // レギュラーが全員目標達成済みの時か、全員不在の時だけ出番が来る
+            return 10000 - priority;
           }
 
           if (actual >= target) {
-            // 目標達成済み → 穴埋めメンバーより下
+            // 目標達成済み → 穴埋めメンバーよりさらに優先度を下げる
             return 0 - priority;
           }
 
           // === 負債（debt）ベースの均等分散スコアリング ===
-          // expected: この時点で本来こなすべき勤務日数
-          // debt: 正=遅れている(出勤すべき), 負=進んでいる(休むべき)
           const expected = target * progress;
           const debt = expected - actual;
 
-          // debtをメインスコア、priorityはタイブレーカー
-          // debtが大きい（遅れている）スタッフほどスコアが高く、優先的に出勤
-          // 例: 木庭(target17)がday1で出勤→debt下がる→中村(target10)のdebtが相対的に上→中村が選ばれる
-          return debt * 100 + (10 - priority);
+          // debtはマイナス（進んでいる）からプラス（遅れている）まで変動する
+          // これに 20000 を足すことで、どれほど進んでいてもTier2（10000）を下回らないようにする
+          return 20000 + (debt * 100) + (10 - priority);
         };
         return getScore(b) - getScore(a);
       });
