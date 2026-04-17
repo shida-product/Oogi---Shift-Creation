@@ -2072,9 +2072,9 @@ function buildEditorOption(label, value, isActive) {
 
 function getComputedPatternColor(pattern) {
   const colors = {
-    '○恵比寿': '#6c5ce7',
-    '○渋谷': '#0984e3',
-    '◯開発': '#fdcb6e',
+    '○恵比寿': '#2D4FBF',
+    '○渋谷': '#E879A8',
+    '◯開発': '#ffeaa7',
     '☆恵比寿': '#2D4FBF',
     '☆渋谷': '#E879A8',
     // 半日パターン（店舗のフルカラーを使用）
