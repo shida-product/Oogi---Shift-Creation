@@ -1402,24 +1402,28 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
 
     // 恵比寿に事務1名配置（日曜除く）
     if (!isEbisuClosed) {
-      // まず恵比寿チーム（木庭・中村）で試行（target上限）
-      if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_EBISU)) {
-        // チーム内target超→チーム内でmax上限まで許容
-        if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_EBISU, true)) {
-          // チーム内全滅→渋谷チームからフォールバック（overflow許容）
-          tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_EBISU, true);
+      if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_EBISU, false, 'full')) {
+        if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_EBISU, true, 'full')) {
+          if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_EBISU, true, 'full')) {
+            // 他店舗を含めてフルタイム要員が全滅した場合のみ、半日フォールバック
+            if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_EBISU, true, 'half')) {
+              tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_EBISU, true, 'half');
+            }
+          }
         }
       }
     }
 
     // 渋谷に事務1名配置
     {
-      // まず渋谷チーム（諫早・本庄）で試行（target上限）
-      if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_SHIBUYA)) {
-        // チーム内target超→チーム内でmax上限まで許容
-        if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_SHIBUYA, true)) {
-          // チーム内全滅→恵比寿チームからフォールバック（overflow許容）
-          tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_SHIBUYA, true);
+      if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_SHIBUYA, false, 'full')) {
+        if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_SHIBUYA, true, 'full')) {
+          if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_SHIBUYA, true, 'full')) {
+            // 他店舗を含めてフルタイム要員が全滅した場合のみ、半日フォールバック
+            if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_SHIBUYA, true, 'half')) {
+              tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_SHIBUYA, true, 'half');
+            }
+          }
         }
       }
     }
