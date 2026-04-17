@@ -171,6 +171,26 @@ const state = {
 
 const HISTORY_MAX = 50; // 履歴の最大件数
 
+function saveHistoryToLocal() {
+  const yearMonth = getCurrentYearMonth();
+  try {
+    const data = {
+      baseline: state.baselineAssignments,
+      history: state.history,
+      historyIndex: state.historyIndex
+    };
+    localStorage.setItem(`shift_history_${yearMonth}`, JSON.stringify(data));
+  } catch (e) { console.error('ローカル履歴保存エラー', e); }
+}
+
+function loadHistoryFromLocal(yearMonth) {
+  try {
+    const raw = localStorage.getItem(`shift_history_${yearMonth}`);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { console.error('ローカル履歴読込エラー', e); }
+  return null;
+}
+
 // ディープコピー（assignments配列用）
 function cloneAssignments(assignments) {
   return assignments.map(a => ({ ...a }));
@@ -184,6 +204,7 @@ function pushHistory() {
   if (state.history.length > HISTORY_MAX) state.history.shift();
   state.historyIndex = state.history.length - 1;
   updateUndoRedoButtons();
+  saveHistoryToLocal();
 }
 
 // ============================================================
@@ -209,6 +230,7 @@ async function restoreFromHistory(index) {
   renderGantt();
   renderConditionsCheck();
   updateUndoRedoButtons();
+  saveHistoryToLocal();
 }
 
 function handleUndo() {
@@ -229,6 +251,7 @@ async function handleReset() {
   renderGantt();
   renderConditionsCheck();
   updateUndoRedoButtons();
+  saveHistoryToLocal();
 }
 
 function updateUndoRedoButtons() {
@@ -518,9 +541,21 @@ async function loadExistingAssignments() {
     renderOtherList();
 
     // 初期状態を保存（リセット・Undo用）
-    state.baselineAssignments = cloneAssignments(state.assignments);
-    state.history = [cloneAssignments(state.assignments)];
-    state.historyIndex = 0;
+    const localData = loadHistoryFromLocal(yearMonth);
+    // DBの内容と大きく乖離していない前提で、ローカルキャッシュに履歴があれば復元
+    if (localData && localData.history && localData.history.length > 0) {
+      state.baselineAssignments = localData.baseline;
+      state.history = localData.history;
+      state.historyIndex = localData.historyIndex ?? (localData.history.length - 1);
+      // DBよりもローカルの最新履歴（未保存状態など）を優先して復元する
+      state.assignments = cloneAssignments(state.history[state.historyIndex]);
+      // もしDBと同期させたい場合はここでsaveAssignmentsを呼ぶのもあり
+    } else {
+      state.baselineAssignments = cloneAssignments(state.assignments);
+      state.history = [cloneAssignments(state.assignments)];
+      state.historyIndex = 0;
+      saveHistoryToLocal();
+    }
     updateUndoRedoButtons();
   } else {
     state.hasGenerated = false;
@@ -588,6 +623,7 @@ async function handleGenerate() {
     state.history = [cloneAssignments(state.assignments)];
     state.historyIndex = 0;
     updateUndoRedoButtons();
+    saveHistoryToLocal();
   } catch (err) {
     console.error(err);
     showToast('生成エラー: ' + err.message, 'error');
