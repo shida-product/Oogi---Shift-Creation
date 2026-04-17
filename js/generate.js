@@ -102,7 +102,7 @@ function getAvailablePatterns(staff) {
     return ['', '☆恵比寿', '☆渋谷'];
   }
   if (staff.staff_type === 'part_time' && staff.role === 'office') {
-    return ['', '☆恵比寿', '☆渋谷', '午後☆渋谷', '午前☆恵比寿', '午後☆恵比寿', '午前☆渋谷'];
+    return ['', '☆恵比寿', '午前☆恵比寿', '午後☆恵比寿', '☆渋谷', '午前☆渋谷', '午後☆渋谷'];
   }
   return [''];
 }
