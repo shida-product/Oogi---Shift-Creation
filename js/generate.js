@@ -11,6 +11,35 @@ import { supabase } from './supabase-config.js';
 // ============================================================
 // 定数
 // ============================================================
+
+// 曜日ラベル（共通）
+const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
+
+// リクエスト種別 → 表示ラベル
+const REQUEST_TYPE_LABEL = {
+  off: '休み希望',
+  am: 'AM可（午前のみ出勤可）',
+  pm: 'PM可（午後のみ出勤可）',
+  dispense: '調剤（他薬局での調剤業務）',
+  ringo: 'りんご',
+  other: 'その他の希望',
+};
+
+// リクエスト種別 → ストライプCSSクラス
+const REQUEST_TYPE_CSS = {
+  off: 'bg-stripe-off',
+  am: 'bg-stripe-am',
+  pm: 'bg-stripe-pm',
+  dispense: 'bg-stripe-dispense',
+  ringo: 'bg-stripe-ringo',
+  other: 'bg-stripe-other',
+};
+
+// リクエスト種別 → 絵文字アイコン
+const REQUEST_TYPE_ICON = { off: '🔴', am: '🟢', pm: '🔵', dispense: '🟠', ringo: '', other: '🟡' };
+
+// CSV出力時に「平日」として扱うリクエスト種別（それ以外は「所定休日」）
+const CSV_WEEKDAY_REQUEST_TYPES = ['am', 'pm', 'ringo'];
 const STORES = { EBISU: 'ebisu', SHIBUYA: 'shibuya' };
 
 // 勤務パターン定義
@@ -144,11 +173,25 @@ function pushHistory() {
   updateUndoRedoButtons();
 }
 
+// ============================================================
+// ユーティリティ関数（上部に集約）
+// ============================================================
+
+// state の現在年月を "YYYY-MM" 形式で返す
+function getCurrentYearMonth() {
+  return `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+}
+
+// Date オブジェクトを "M/D（曜）" 形式のラベルに変換
+function formatDateLabel(dt) {
+  return `${dt.getMonth() + 1}/${dt.getDate()}（${DAY_NAMES[dt.getDay()]}）`;
+}
+
 // 履歴からassignmentsを復元してUI更新
 async function restoreFromHistory(index) {
   state.historyIndex = index;
   state.assignments = cloneAssignments(state.history[index]);
-  const yearMonth = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+  const yearMonth = getCurrentYearMonth();
   await saveAssignments(yearMonth, state.assignments);
   renderGantt();
   renderConditionsCheck();
@@ -169,8 +212,7 @@ async function handleReset() {
   // 履歴をクリアして初期状態に戻す
   state.history = [cloneAssignments(state.assignments)];
   state.historyIndex = 0;
-  const yearMonth = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
-  await saveAssignments(yearMonth, state.assignments);
+  await saveAssignments(getCurrentYearMonth(), state.assignments);
   renderGantt();
   renderConditionsCheck();
   updateUndoRedoButtons();
@@ -329,8 +371,6 @@ function renderOtherList() {
   const countEl = document.getElementById('other-reqs-count');
   if (!accordion || !listEl) return;
 
-  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-
   // 対象フィルタ：休み（備考あり）+ 条件付き全種
   const filtered = state.requests
     .filter(r => r.request_type !== 'off' || (r.request_type === 'off' && r.note))
@@ -345,8 +385,7 @@ function renderOtherList() {
     const last = grouped.length > 0 ? grouped[grouped.length - 1] : null;
     if (last && last.staff_id === r.staff_id && last.request_type === r.request_type && last.note === r.note) {
       const nextDate = new Date(new Date(last.end_date + 'T00:00:00').getTime() + 86400000);
-      const nextStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth()+1).padStart(2,'0')}-${String(nextDate.getDate()).padStart(2,'0')}`;
-      if (r.date === nextStr) { last.end_date = r.date; return; }
+      if (r.date === formatDate(nextDate)) { last.end_date = r.date; return; }
     }
     grouped.push({ ...r, start_date: r.date, end_date: r.date });
   });
@@ -366,18 +405,13 @@ function renderOtherList() {
 
     const startDt = new Date(g.start_date + 'T00:00:00');
     const endDt = new Date(g.end_date + 'T00:00:00');
-    let dateLabel = `${startDt.getMonth()+1}/${startDt.getDate()}（${dayNames[startDt.getDay()]}）`;
+    let dateLabel = formatDateLabel(startDt);
     if (g.start_date !== g.end_date) {
-      dateLabel += `〜${endDt.getMonth()+1}/${endDt.getDate()}（${dayNames[endDt.getDay()]}）`;
+      dateLabel += `〜${formatDateLabel(endDt)}`;
     }
 
-    let typeLabel, itemCls;
-    if (g.request_type === 'am') { typeLabel = 'AM可'; itemCls = 'other-list__item--am'; }
-    else if (g.request_type === 'pm') { typeLabel = 'PM可'; itemCls = 'other-list__item--pm'; }
-    else if (g.request_type === 'dispense') { typeLabel = '調剤'; itemCls = 'other-list__item--dispense'; }
-    else if (g.request_type === 'ringo') { typeLabel = 'りんご'; itemCls = 'other-list__item--ringo'; }
-    else if (g.request_type === 'off') { typeLabel = '休み'; itemCls = 'other-list__item--off'; }
-    else { typeLabel = 'その他'; itemCls = 'other-list__item--other'; }
+    const typeLabel = REQUEST_TYPE_LABEL[g.request_type]?.replace(/（.*?）/, '') || 'その他';
+    const itemCls = `other-list__item--${g.request_type || 'other'}`;
 
     const noteHtml = g.note ? `<span class="other-list__note">${g.note}</span>` : '';
     return `<div class="other-list__item ${itemCls} other-list__item--clickable" data-staff="${g.staff_id}" data-start="${g.start_date}" data-end="${g.end_date}" data-type="${g.request_type}">
@@ -397,8 +431,7 @@ function renderOtherList() {
 
       let d = new Date(startDate);
       while (d <= endDate) {
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const cell = document.querySelector(`.day-cell[data-staff="${staffId}"][data-date="${dateStr}"]`);
+        const cell = document.querySelector(`.day-cell[data-staff="${staffId}"][data-date="${formatDate(d)}"]`);
         if (cell) cell.classList.add(`is-hover-${reqType}`);
         d.setDate(d.getDate() + 1);
       }
@@ -412,8 +445,7 @@ function renderOtherList() {
 
       let d = new Date(startDate);
       while (d <= endDate) {
-        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        const cell = document.querySelector(`.day-cell[data-staff="${staffId}"][data-date="${dateStr}"]`);
+        const cell = document.querySelector(`.day-cell[data-staff="${staffId}"][data-date="${formatDate(d)}"]`);
         if (cell) cell.classList.remove(`is-hover-${reqType}`);
         d.setDate(d.getDate() + 1);
       }
@@ -453,7 +485,7 @@ async function loadRequests(yearMonth) {
 }
 
 async function loadExistingAssignments() {
-  const yearMonth = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+  const yearMonth = getCurrentYearMonth();
 
   // 描画のための希望休データを先にロード
   state.requests = await loadRequests(yearMonth);
@@ -502,7 +534,7 @@ async function handleGenerate() {
   btn.innerHTML = '<span class="loader"></span> 生成中...';
 
   try {
-    const yearMonth = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+    const yearMonth = getCurrentYearMonth();
     state.requests = await loadRequests(yearMonth);
 
     // スコアリング生成：複数回試行して最高スコアを採用
@@ -1594,7 +1626,7 @@ function renderGantt() {
   const sortedStaff = [...state.staffList].filter(s => s.is_active).sort((a, b) => a.display_order - b.display_order);
 
   // 集計欄の色分け用定数
-  const ym = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+  const ym = getCurrentYearMonth();
   const daysOff = state.monthlySettings[ym] || 10;
 
 
@@ -1664,14 +1696,13 @@ function renderGantt() {
 
       // 希望休チェック → 種類別ストライプクラス付与
       const request = state.requests.find(r => r.staff_id === staff.id && r.date === dateStr);
-      const STRIPE_MAP = { off: 'bg-stripe-off', am: 'bg-stripe-am', pm: 'bg-stripe-pm', dispense: 'bg-stripe-dispense', ringo: 'bg-stripe-ringo', other: 'bg-stripe-other' };
 
       let cellContent = '';
       let cellClass = 'day-cell';
 
       // 希望があればストライプクラス付与
-      if (request && STRIPE_MAP[request.request_type]) {
-        cellClass += ` ${STRIPE_MAP[request.request_type]}`;
+      if (request && REQUEST_TYPE_CSS[request.request_type]) {
+        cellClass += ` ${REQUEST_TYPE_CSS[request.request_type]}`;
       }
 
       if (staff.staff_type === 'external') {
@@ -1695,7 +1726,7 @@ function renderGantt() {
 
       // ストライプがあればdata属性にリクエスト情報を埋め込む
       let requestAttrs = '';
-      if (request && STRIPE_MAP[request.request_type]) {
+      if (request && REQUEST_TYPE_CSS[request.request_type]) {
         requestAttrs = ` data-request-type="${request.request_type}" data-request-note="${escapeHtml(request.note || '')}"`;
       }
 
@@ -1718,16 +1749,7 @@ function renderGantt() {
     });
   });
 
-  // ストライプセル：ホバーツールチップ
-  const STRIPE_LABEL = {
-    off: '休み希望',
-    am: 'AM可（午前のみ出勤可）',
-    pm: 'PM可（午後のみ出勤可）',
-    dispense: '調剤（他薬局での調剤業務）',
-    ringo: 'りんご',
-    other: 'その他の希望',
-  };
-  const STRIPE_ICON = { off: '🔴', am: '🟢', pm: '🔵', dispense: '🟠', ringo: '', other: '🟡' };
+  // ストライプセル：ホバーツールチップ（REQUEST_TYPE_LABEL / REQUEST_TYPE_ICON を使用）
   const tooltip = document.getElementById('stripe-tooltip');
   const tooltipType = document.getElementById('stripe-tooltip-type');
   const tooltipNote = document.getElementById('stripe-tooltip-note');
@@ -1736,7 +1758,7 @@ function renderGantt() {
     cell.addEventListener('mouseenter', () => {
       const type = cell.dataset.requestType;
       const note = cell.dataset.requestNote || '';
-      tooltipType.textContent = `${STRIPE_ICON[type] || ''} ${STRIPE_LABEL[type] || type}`;
+      tooltipType.textContent = `${REQUEST_TYPE_ICON[type] || ''} ${REQUEST_TYPE_LABEL[type] || type}`;
       tooltipNote.textContent = note;
       tooltip.style.display = 'block';
     });
@@ -1836,9 +1858,8 @@ function openCellEditor(cell, staff, dateStr) {
   const currentAttendance = currentAssign?.attendance_type || '平日';
 
   const dt = new Date(dateStr + 'T00:00:00');
-  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
   document.getElementById('cell-editor-title').textContent =
-    `${staff.name} - ${dt.getMonth() + 1}/${dt.getDate()}（${dayNames[dt.getDay()]}）`;
+    `${staff.name} - ${formatDateLabel(dt)}`;
 
   const optionsHtml = [];
   // 所定休日オプション
@@ -1894,7 +1915,7 @@ function openCellEditor(cell, staff, dateStr) {
         state.assignments[idx].is_manual_override = true;
       } else {
         state.assignments.push({
-          year_month: `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`,
+          year_month: getCurrentYearMonth(),
           staff_id: staff.id,
           date: dateStr,
           attendance_type: newAttendance,
@@ -1907,7 +1928,7 @@ function openCellEditor(cell, staff, dateStr) {
       try {
         await supabase.from('shift_assignments')
           .upsert({
-            year_month: `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`,
+            year_month: getCurrentYearMonth(),
             staff_id: staff.id,
             date: dateStr,
             attendance_type: newAttendance,
@@ -1922,7 +1943,7 @@ function openCellEditor(cell, staff, dateStr) {
 
       editor.style.display = 'none';
       // 手動変更後にスコアを再計算して内訳も更新
-      const yearMonthNow = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+      const yearMonthNow = getCurrentYearMonth();
       const { score: newScore, breakdown: newBreakdown } = scoreShifts(state.assignments, yearMonthNow);
       state.lastScore = newScore;
       state.lastBreakdown = newBreakdown;
@@ -1960,7 +1981,7 @@ function getComputedPatternColor(pattern) {
 // CSV出力（Shift-JIS）
 // ============================================================
 function handleCSVExport() {
-  const yearMonth = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+  const yearMonth = getCurrentYearMonth();
   const [year, month] = yearMonth.split('-').map(Number);
   const daysInMonth = new Date(year, month, 0).getDate();
 
@@ -1988,9 +2009,9 @@ function handleCSVExport() {
       let attendance = assign?.attendance_type || '平日';
       const pattern = assign?.work_pattern || '';
 
-      // CSV出力時のみ、「AM可」「PM可」「りんご」以外の希望が出ている日は全て「所定休日」として扱う
+      // CSV出力時のみ、CSV_WEEKDAY_REQUEST_TYPES以外の希望が出ている日は「所定休日」として出力
       if (attendance === '所定休日') {
-        const isHolidayRequest = state.requests.some(r => r.staff_id === staff.id && r.date === dateStr && !['am', 'pm', 'ringo'].includes(r.request_type));
+        const isHolidayRequest = state.requests.some(r => r.staff_id === staff.id && r.date === dateStr && !CSV_WEEKDAY_REQUEST_TYPES.includes(r.request_type));
         if (!isHolidayRequest) {
           attendance = '平日';
         }
@@ -2117,7 +2138,7 @@ async function renderHistoryPanel() {
   if (!panel || !thead || !tbody) return;
 
   const { months, byStaffMonth } = await loadHistoryData();
-  const currentYM = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+  const currentYM = getCurrentYearMonth();
   const activeStaff = state.staffList.filter(s => s.is_active);
 
   // どの月にもデータがなければパネルを隠す
@@ -2202,7 +2223,7 @@ function renderConditionsCheck() {
   panel.style.display = 'block';
   grid.innerHTML = '';
 
-  const yearMonth = `${state.currentYear}-${String(state.currentMonth + 1).padStart(2, '0')}`;
+  const yearMonth = getCurrentYearMonth();
   const { globalItems, staffChecks } = runAllChecks(state.assignments, yearMonth);
 
   // 未達成サマリー収集用
