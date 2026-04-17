@@ -345,11 +345,11 @@ button { cursor: pointer; border: none; background: none; }
 .legend__dot--stripe-dispense { background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(230,126,34,0.40) 2px, rgba(230,126,34,0.40) 4px); }
 .legend__dot--stripe-ringo    { background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(231,59,59,0.40) 2px, rgba(231,59,59,0.40) 4px); }
 .legend__dot--manual          { background: var(--color-surface); border: 2px solid var(--color-warning); }
-/* 半日出勤パターン凡例ドット（内側ダッシュ枠でフルタイムと区別）*/
-.legend__dot--am-part-ebisu   { background: #6880D0; outline: 2px dashed rgba(255,255,255,0.7); outline-offset: -3px; }
-.legend__dot--pm-part-ebisu   { background: #6880D0; outline: 2px dashed rgba(255,255,255,0.7); outline-offset: -3px; }
-.legend__dot--am-part-shibuya { background: #D4689A; outline: 2px dashed rgba(255,255,255,0.7); outline-offset: -3px; }
-.legend__dot--pm-part-shibuya { background: #D4689A; outline: 2px dashed rgba(255,255,255,0.7); outline-offset: -3px; }
+/* 半日出勤パターン凡例ドット（店舗フルカラー＋内側ダッシュ枠でフルタイムと区別）*/
+.legend__dot--am-part-ebisu   { background: #2D4FBF; outline: 2px dashed rgba(255,255,255,0.7); outline-offset: -3px; }
+.legend__dot--pm-part-ebisu   { background: #2D4FBF; outline: 2px dashed rgba(255,255,255,0.7); outline-offset: -3px; }
+.legend__dot--am-part-shibuya { background: #E879A8; outline: 2px dashed rgba(255,255,255,0.7); outline-offset: -3px; }
+.legend__dot--pm-part-shibuya { background: #E879A8; outline: 2px dashed rgba(255,255,255,0.7); outline-offset: -3px; }
 
 /* Forms (Inputs, Selects) */
 .input-field,

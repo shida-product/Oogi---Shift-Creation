@@ -79,12 +79,12 @@ const PATTERN_LABEL = {
   '◯開発': '開発',
   '☆恵比寿': '恵',
   '☆渋谷': '渋',
-  '午後☆渋谷': '午渋',
+  '午後☆渋谷': 'PM',
   'りんご': 'りん',
-  // 半日パターン
-  '午前☆恵比寿': '午前恵',
-  '午後☆恵比寿': '午後恵',
-  '午前☆渋谷':   '午前渋',
+  // 半日パターン（AM可/PM可→ガント表示は「AM」「PM」, 色は店舗のフルカラー）
+  '午前☆恵比寿': 'AM',
+  '午後☆恵比寿': 'PM',
+  '午前☆渋谷':   'AM',
 };
 
 // スタッフ別の使用可能パターン（staff_type + role で決定）
@@ -1703,7 +1703,7 @@ function renderGantt() {
     const staff = sortedStaff[idx];
     // 薬剤師グループの最終行に境界線クラスを付与
     const trClass = (idx === lastPharmacistIdx) ? ' class="is-group-divider"' : '';
-    bodyHtml += `<tr${trClass}><td class="staff-name">${escapeHtml(staff.name)}</td>`;
+    bodyHtml += `<tr${trClass} data-staff-name="${escapeHtml(staff.name)}"><td class="staff-name">${escapeHtml(staff.name)}</td>`;
     // スタッフ名の右横に集計列
     const staffAssigns = state.assignments.filter(a => a.staff_id === staff.id);
     const workCount = staffAssigns.filter(a => a.work_pattern && a.work_pattern !== '').length;
@@ -1783,7 +1783,7 @@ function renderGantt() {
       } else if (pattern) {
         // 特殊パターン（りんご、出張等）
         cellContent = `<div class="pattern-marker pattern-marker--special">${escapeHtml(pattern.substring(0, 2))}</div>`;
-      } else if (attendance === '所定休日' || attendance === '法定休日') {
+      } else if (attendance === '所定休日' || attendance === '法定休日' || (!pattern && request && (request.request_type === 'am' || request.request_type === 'pm'))) {
         cellContent = `<div class="pattern-marker pattern-marker--off">休</div>`;
       }
 
@@ -2033,13 +2033,13 @@ function getComputedPatternColor(pattern) {
     '○恵比寿': '#6c5ce7',
     '○渋谷': '#0984e3',
     '◯開発': '#fdcb6e',
-    '☆恵比寿': '#a29bfe',
-    '☆渋谷': '#74b9ff',
-    '午後☆渋谷': '#D4689A',
-    // 半日パターン
-    '午前☆恵比寿': '#6880D0',
-    '午後☆恵比寿': '#6880D0',
-    '午前☆渋谷':   '#D4689A',
+    '☆恵比寿': '#2D4FBF',
+    '☆渋谷': '#E879A8',
+    // 半日パターン（店舗のフルカラーを使用）
+    '午後☆渋谷': '#E879A8',
+    '午前☆恵比寿': '#2D4FBF',
+    '午後☆恵比寿': '#2D4FBF',
+    '午前☆渋谷':   '#E879A8',
   };
   return colors[pattern] || '#ccc';
 }
@@ -2320,6 +2320,7 @@ function renderConditionsCheck() {
 
     const card = document.createElement('div');
     card.className = 'staff-conditions-card';
+    card.setAttribute('data-target-staff', title);
     const titleEl = document.createElement('div');
     titleEl.className = 'staff-conditions-card__title';
     titleEl.textContent = title;
@@ -2387,5 +2388,35 @@ function renderConditionsCheck() {
       badge.className = 'conditions-header-badge conditions-header-badge--ng';
     }
   }
+
+  // ===== ホバー時のハイライト処理 =====
+  grid.addEventListener('mouseover', (e) => {
+    const item = e.target.closest('.condition-item');
+    if (!item) return;
+    const card = e.target.closest('.staff-conditions-card');
+    if (!card) return;
+    
+    // NG項目（fail/warn）の場合のみハイライト
+    const isNg = item.classList.contains('condition-item--fail') || item.classList.contains('condition-item--warn');
+    if (isNg) {
+      const staffName = card.getAttribute('data-target-staff');
+      if (staffName && staffName !== '店舗充足' && staffName !== '希望休') {
+        const rows = document.querySelectorAll(`#gantt-body tr[data-staff-name="${staffName}"]`);
+        rows.forEach(tr => tr.classList.add('is-hover-highlight'));
+      }
+    }
+  });
+
+  grid.addEventListener('mouseout', (e) => {
+    const item = e.target.closest('.condition-item');
+    if (!item) return;
+    const card = e.target.closest('.staff-conditions-card');
+    if (!card) return;
+    const staffName = card.getAttribute('data-target-staff');
+    if (staffName) {
+      const rows = document.querySelectorAll(`#gantt-body tr[data-staff-name="${staffName}"]`);
+      rows.forEach(tr => tr.classList.remove('is-hover-highlight'));
+    }
+  });
 }
 

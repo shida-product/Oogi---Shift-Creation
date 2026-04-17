@@ -272,20 +272,20 @@
   color: #fff;
 }
 
-/* ━━ 半日出勤（AM可/PM可対応）：薄色＋内側ダッシュ枠で区別━━ */
+/* ━━ 半日出勤（AM可/PM可対応）：店舗カラーをそのまま使用、内側ダッシュ枠でフルタイムと区別━━ */
 .pattern-marker--pm-part-shibuya,
 .pattern-marker--am-part-shibuya {
-  background: #D4689A;
+  background: #E879A8;  /* 渋谷フルカラー */
   color: #fff;
-  outline: 2px dashed rgba(255,255,255,0.5);
+  outline: 2px dashed rgba(255,255,255,0.55);
   outline-offset: -4px;
 }
 
 .pattern-marker--am-part-ebisu,
 .pattern-marker--pm-part-ebisu {
-  background: #6880D0;
+  background: #2D4FBF;  /* 恵比寿フルカラー */
   color: #fff;
-  outline: 2px dashed rgba(255,255,255,0.5);
+  outline: 2px dashed rgba(255,255,255,0.55);
   outline-offset: -4px;
 }
 
@@ -331,6 +331,11 @@
 @keyframes row-highlight {
   0%   { background: rgba(99, 102, 241, 0.25); }
   100% { background: transparent; }
+}
+
+/* 条件NG項目のホバーハイライト */
+.gantt-table tbody tr.is-hover-highlight td {
+  background: rgba(239, 68, 68, 0.15) !important; /* 薄い赤（Dangerカラー） */
 }
 
 /* 薬剤師グループと事務グループの境界線 */
