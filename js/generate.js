@@ -1342,14 +1342,8 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
           const priority = staff.store_priority?.[store] ?? 99;
           const actual = workCounts[staff.id].total;
 
-          // スコアの階層（Tier）を確実にするためのベーススコア
-          // Tier 1: 目標未達成のレギュラースタッフ (Base: 20000)
-          // Tier 2: 目標なしの穴埋めスタッフ (Base: 10000)
-          // Tier 3: 目標達成済みのレギュラースタッフ (Base: 0)
-
           if (target === 0) {
             // 目標なし（本庄さんなど）は穴埋め要員
-            // レギュラーが全員目標達成済みの時か、全員不在の時だけ出番が来る
             return 10000 - priority;
           }
 
@@ -1358,13 +1352,23 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
             return 0 - priority;
           }
 
-          // === 負債（debt）ベースの均等分散スコアリング ===
+          // === グラデーション方式のスコアリング ===
+          // 達成率が上がるにつれ、ベーススコアが 20000 → 10000 へ徐々に下降する。
+          // これにより、目標に近づいたレギュラーのスコアが本庄（10000）と
+          // 自然に競合し始め、本庄にも出番が回るようになる。
+          //
+          // 例（諫早 target=18）:
+          //   actual= 0 (0%)  → base=20000 → 絶対優先
+          //   actual= 9 (50%) → base=15000 → まだ優先
+          //   actual=15 (83%) → base=11667 → 本庄に近づいてきた
+          //   actual=17 (94%) → base=10556 → 本庄とほぼ同格、出番を譲り始める
+          const completionRate = Math.min(actual / target, 1.0);
+          const base = 20000 - (completionRate * 10000);
+
           const expected = target * progress;
           const debt = expected - actual;
 
-          // debtはマイナス（進んでいる）からプラス（遅れている）まで変動する
-          // これに 20000 を足すことで、どれほど進んでいてもTier2（10000）を下回らないようにする
-          return 20000 + (debt * 100) + (10 - priority);
+          return base + (debt * 100) + (10 - priority);
         };
         return getScore(b) - getScore(a);
       });
@@ -1403,12 +1407,18 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
     }
 
     // 恵比寿に事務1名配置（日曜除く）
+    // 優先順位:
+    //   1. 自店舗フルタイム（通常）
+    //   2. 自店舗フルタイム（上限オーバー許容）
+    //   3. 自店舗半日（AM/PM） ← 他店舗から引っ張るより、ホームの半日を優先
+    //   4. 他店舗フルタイム応援（自店舗が完全に無理な場合のみ）
+    //   5. 他店舗半日応援（最終手段）
     if (!isEbisuClosed) {
       if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_EBISU, false, 'full')) {
         if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_EBISU, true, 'full')) {
-          if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_EBISU, true, 'full')) {
-            // 他店舗を含めてフルタイム要員が全滅した場合のみ、半日フォールバック
-            if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_EBISU, true, 'half')) {
+          if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_EBISU, true, 'half')) {
+            // 自店舗チームが完全に無理 → 他店舗から応援
+            if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_EBISU, true, 'full')) {
               tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_EBISU, true, 'half');
             }
           }
@@ -1416,13 +1426,13 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
       }
     }
 
-    // 渋谷に事務1名配置
+    // 渋谷に事務1名配置（同じ優先順位ロジック）
     {
       if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_SHIBUYA, false, 'full')) {
         if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_SHIBUYA, true, 'full')) {
-          if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_SHIBUYA, true, 'full')) {
-            // 他店舗を含めてフルタイム要員が全滅した場合のみ、半日フォールバック
-            if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_SHIBUYA, true, 'half')) {
+          if (!tryAssignOffice(shibuyaTeam, dateStr, PATTERNS.PART_SHIBUYA, true, 'half')) {
+            // 自店舗チームが完全に無理 → 他店舗から応援
+            if (!tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_SHIBUYA, true, 'full')) {
               tryAssignOffice(ebisuTeam, dateStr, PATTERNS.PART_SHIBUYA, true, 'half');
             }
           }
