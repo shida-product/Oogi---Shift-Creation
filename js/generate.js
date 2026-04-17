@@ -1783,8 +1783,11 @@ function renderGantt() {
       } else if (pattern) {
         // 特殊パターン（りんご、出張等）
         cellContent = `<div class="pattern-marker pattern-marker--special">${escapeHtml(pattern.substring(0, 2))}</div>`;
-      } else if (attendance === '所定休日' || attendance === '法定休日' || (!pattern && request && (request.request_type === 'am' || request.request_type === 'pm'))) {
-        cellContent = `<div class="pattern-marker pattern-marker--off">休</div>`;
+      } else if (attendance === '所定休日' || attendance === '法定休日') {
+        const isExplicitOff = isManual || (request && !CSV_WEEKDAY_REQUEST_TYPES.includes(request.request_type));
+        if (isExplicitOff) {
+          cellContent = `<div class="pattern-marker pattern-marker--off">休</div>`;
+        }
       }
 
       // ストライプがあればdata属性にリクエスト情報を埋め込む
