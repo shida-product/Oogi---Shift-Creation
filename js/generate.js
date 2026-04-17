@@ -1263,10 +1263,10 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
       if (shouldWork) {
         addAssignment(tokunaga.id, dateStr, '平日', tokunagaPattern);
       } else {
-        // AM可・PM可の日は「平日（勤務なし）」として記録（所定休日にしない）
+        // 平日扱いの希望日（AM可・PM可・りんご等）は「平日（勤務なし）」として記録（所定休日にしない）
         const tokReq = requestMap[`${tokunaga.id}_${dateStr}`];
-        const isAmPm = tokReq && (tokReq.request_type === 'am' || tokReq.request_type === 'pm');
-        addAssignment(tokunaga.id, dateStr, isAmPm ? '平日' : '所定休日', '');
+        const isWeekdayReq = tokReq && CSV_WEEKDAY_REQUEST_TYPES.includes(tokReq.request_type);
+        addAssignment(tokunaga.id, dateStr, isWeekdayReq ? '平日' : '所定休日', '');
       }
     }
 
@@ -1389,14 +1389,14 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
     }
 
     // 未配置の事務パートは休日
-    // ただし AM可・PM可で外れた日は「平日（勤務なし）」として記録（所定休日にしない）
+    // ただし 平日扱いの希望日（AM可・PM可・りんご等）で外れた日は「平日（勤務なし）」として記録（所定休日にしない）
     for (const staff of officeStaff) {
       if (manualSet.has(`${staff.id}_${dateStr}`)) continue;
       if (assignedOfficeToday.has(staff.id)) continue;
       if (!result.find(a => a.staff_id === staff.id && a.date === dateStr)) {
         const officeReq = requestMap[`${staff.id}_${dateStr}`];
-        const isAmPm = officeReq && (officeReq.request_type === 'am' || officeReq.request_type === 'pm');
-        addAssignment(staff.id, dateStr, isAmPm ? '平日' : '所定休日', '');
+        const isWeekdayReq = officeReq && CSV_WEEKDAY_REQUEST_TYPES.includes(officeReq.request_type);
+        addAssignment(staff.id, dateStr, isWeekdayReq ? '平日' : '所定休日', '');
       }
     }
 
@@ -1435,7 +1435,9 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
       if (murakamiPattern) {
         addAssignment(murakami.id, dateStr, '平日', murakamiPattern);
       } else {
-        addAssignment(murakami.id, dateStr, '平日', '');
+        const req = requestMap[`${murakami.id}_${dateStr}`];
+        const isHolidayReq = req && !CSV_WEEKDAY_REQUEST_TYPES.includes(req.request_type);
+        addAssignment(murakami.id, dateStr, isHolidayReq ? '所定休日' : '平日', '');
       }
 
       // 最終充足チェック → 警告
@@ -2399,27 +2401,28 @@ function renderConditionsCheck() {
     const card = e.target.closest('.staff-conditions-card');
     if (!card) return;
     
-    // NG項目（fail/warn）の場合のみハイライト
     const isNg = item.classList.contains('condition-item--fail') || item.classList.contains('condition-item--warn');
-    if (isNg) {
-      const staffName = card.getAttribute('data-target-staff');
-      if (staffName && staffName !== '店舗充足' && staffName !== '希望休') {
-        const rows = document.querySelectorAll(`#gantt-body tr[data-staff-name="${staffName}"]`);
-        rows.forEach(tr => tr.classList.add('is-hover-highlight'));
+    if (!isNg) return;
+
+    const staffName = card.getAttribute('data-target-staff');
+
+    // 全体カードの「希望休」エラー時にピンポイントでハイライト
+    if (staffName === '希望休') {
+      const offRequests = state.requests.filter(r => r.request_type === 'off');
+      for (const req of offRequests) {
+        const assign = state.assignments.find(a => a.staff_id === req.staff_id && a.date === req.date);
+        if (assign && assign.work_pattern && assign.work_pattern !== '') {
+          // 該当スタッフ×該当日のセルを検索してハイライト
+          const cell = document.querySelector(`#gantt-body td[data-staff="${req.staff_id}"][data-date="${req.date}"]`);
+          if (cell) cell.classList.add('is-hover-highlight-cell');
+        }
       }
     }
   });
 
   grid.addEventListener('mouseout', (e) => {
-    const item = e.target.closest('.condition-item');
-    if (!item) return;
-    const card = e.target.closest('.staff-conditions-card');
-    if (!card) return;
-    const staffName = card.getAttribute('data-target-staff');
-    if (staffName) {
-      const rows = document.querySelectorAll(`#gantt-body tr[data-staff-name="${staffName}"]`);
-      rows.forEach(tr => tr.classList.remove('is-hover-highlight'));
-    }
+    // どの要素から外れたかに関わらず、セルハイライトを全削除
+    document.querySelectorAll('.is-hover-highlight-cell').forEach(c => c.classList.remove('is-hover-highlight-cell'));
   });
 }
 
