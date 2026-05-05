@@ -153,13 +153,23 @@ function getHolidays(year) {
 // ============================================================
 // 状態管理
 // ============================================================
+let initYear = new Date().getFullYear();
+let initMonth = new Date().getMonth();
+if (initYear < 2026 || (initYear === 2026 && initMonth < 3)) {
+  initYear = 2026;
+  initMonth = 3;
+} else if (initYear > 2026 || (initYear === 2026 && initMonth > 11)) {
+  initYear = 2026;
+  initMonth = 11;
+}
+
 const state = {
   staffList: [],
   requests: [],       // shift_requests（希望休）
   assignments: [],     // shift_assignments（生成結果）
   monthlySettings: {},
-  currentYear: new Date().getFullYear(),
-  currentMonth: new Date().getMonth(),
+  currentYear: initYear,
+  currentMonth: initMonth,
   holidays: {},
   warnings: [],
   hasGenerated: false,
@@ -280,8 +290,12 @@ function bindEvents() {
   document.getElementById('next-month').addEventListener('click', () => changeMonth(1));
   document.getElementById('today-month-btn').addEventListener('click', () => {
     const now = new Date();
-    state.currentYear = now.getFullYear();
-    state.currentMonth = now.getMonth();
+    let ty = now.getFullYear();
+    let tm = now.getMonth();
+    if (ty < 2026 || (ty === 2026 && tm < 3)) { ty = 2026; tm = 3; }
+    else if (ty > 2026 || (ty === 2026 && tm > 11)) { ty = 2026; tm = 11; }
+    state.currentYear = ty;
+    state.currentMonth = tm;
     state.holidays = { ...getHolidays(state.currentYear), ...getHolidays(state.currentYear + 1) };
     renderMonth();
     loadExistingAssignments();
@@ -332,9 +346,10 @@ function renderMonthPickerGrid() {
   const grid = document.getElementById('picker-month-grid');
   grid.innerHTML = MONTH_LABELS.map((label, i) => {
     const isCurrent = (pickerYear === state.currentYear && i === state.currentMonth);
-    return `<button class="month-picker__month-btn${isCurrent ? ' is-current' : ''}" data-month="${i}">${label}</button>`;
+    const isDisabled = pickerYear < 2026 || (pickerYear === 2026 && i < 3) || pickerYear > 2026 || (pickerYear === 2026 && i > 11);
+    return `<button class="month-picker__month-btn${isCurrent ? ' is-current' : ''}" data-month="${i}" ${isDisabled ? 'disabled style="opacity:0.3;cursor:not-allowed;"' : ''}>${label}</button>`;
   }).join('');
-  grid.querySelectorAll('.month-picker__month-btn').forEach(btn => {
+  grid.querySelectorAll('.month-picker__month-btn:not([disabled])').forEach(btn => {
     btn.addEventListener('click', () => {
       state.currentYear = pickerYear;
       state.currentMonth = parseInt(btn.dataset.month, 10);
@@ -344,6 +359,11 @@ function renderMonthPickerGrid() {
       closeMonthPicker();
     });
   });
+
+  const pPrev = document.getElementById('picker-prev-year');
+  const pNext = document.getElementById('picker-next-year');
+  if(pPrev) { pPrev.disabled = pickerYear <= 2026; pPrev.style.opacity = pPrev.disabled ? '0.3' : '1'; }
+  if(pNext) { pNext.disabled = pickerYear >= 2026; pNext.style.opacity = pNext.disabled ? '0.3' : '1'; }
 }
 
 // ============================================================
@@ -383,9 +403,16 @@ function setupGanttHover() {
 }
 
 function changeMonth(delta) {
-  state.currentMonth += delta;
-  if (state.currentMonth > 11) { state.currentMonth = 0; state.currentYear++; }
-  else if (state.currentMonth < 0) { state.currentMonth = 11; state.currentYear--; }
+  let nextY = state.currentYear;
+  let nextM = state.currentMonth + delta;
+  if (nextM > 11) { nextM = 0; nextY++; }
+  else if (nextM < 0) { nextM = 11; nextY--; }
+  
+  if (nextY < 2026 || (nextY === 2026 && nextM < 3)) return;
+  if (nextY > 2026 || (nextY === 2026 && nextM > 11)) return;
+
+  state.currentMonth = nextM;
+  state.currentYear = nextY;
   state.holidays = { ...getHolidays(state.currentYear), ...getHolidays(state.currentYear + 1) };
   renderMonth();
   loadExistingAssignments();
@@ -394,8 +421,20 @@ function changeMonth(delta) {
 function renderMonth() {
   document.getElementById('month-label').textContent = `${state.currentYear}年 ${state.currentMonth + 1}月`;
   const now = new Date();
-  const isCurrentMonth = (state.currentYear === now.getFullYear() && state.currentMonth === now.getMonth());
-  document.getElementById('today-month-btn').style.display = isCurrentMonth ? 'none' : 'inline-block';
+  let targetYear = now.getFullYear();
+  let targetMonth = now.getMonth();
+
+  if (targetYear < 2026 || (targetYear === 2026 && targetMonth < 3) || targetYear > 2026 || (targetYear === 2026 && targetMonth > 11)) {
+    document.getElementById('today-month-btn').style.display = 'none';
+  } else {
+    const isCurrentMonth = (state.currentYear === targetYear && state.currentMonth === targetMonth);
+    document.getElementById('today-month-btn').style.display = isCurrentMonth ? 'none' : 'inline-block';
+  }
+
+  const prevBtn = document.getElementById('prev-month');
+  const nextBtn = document.getElementById('next-month');
+  if(prevBtn) prevBtn.disabled = (state.currentYear === 2026 && state.currentMonth <= 3) || state.currentYear < 2026;
+  if(nextBtn) nextBtn.disabled = (state.currentYear === 2026 && state.currentMonth >= 11) || state.currentYear > 2026;
 }
 
 // ============================================================
