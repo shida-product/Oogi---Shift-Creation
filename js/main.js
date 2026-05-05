@@ -115,9 +115,9 @@ let initMonth = new Date().getMonth();
 if (initYear < 2026 || (initYear === 2026 && initMonth < 3)) {
   initYear = 2026;
   initMonth = 3;
-} else if (initYear > 2026 || (initYear === 2026 && initMonth > 11)) {
+} else if (initYear > 2026 || (initYear === 2026 && initMonth > 10)) {
   initYear = 2026;
-  initMonth = 11;
+  initMonth = 10;
 }
 
 const state = {
@@ -162,7 +162,7 @@ function bindEvents() {
     let ty = now.getFullYear();
     let tm = now.getMonth();
     if (ty < 2026 || (ty === 2026 && tm < 3)) { ty = 2026; tm = 3; }
-    else if (ty > 2026 || (ty === 2026 && tm > 11)) { ty = 2026; tm = 11; }
+    else if (ty > 2026 || (ty === 2026 && tm > 10)) { ty = 2026; tm = 10; }
     state.currentYear = ty;
     state.currentMonth = tm;
     updateHolidays();
@@ -232,7 +232,7 @@ function renderMonthPickerGrid() {
   const grid = document.getElementById('picker-month-grid');
   grid.innerHTML = MONTH_LABELS.map((label, i) => {
     const isCurrent = (pickerYear === state.currentYear && i === state.currentMonth);
-    const isDisabled = pickerYear < 2026 || (pickerYear === 2026 && i < 3) || pickerYear > 2026 || (pickerYear === 2026 && i > 11);
+    const isDisabled = pickerYear < 2026 || (pickerYear === 2026 && i < 3) || pickerYear > 2026 || (pickerYear === 2026 && i > 10);
     return `<button class="month-picker__month-btn${isCurrent ? ' is-current' : ''}" data-month="${i}" ${isDisabled ? 'disabled style="opacity:0.3;cursor:not-allowed;"' : ''}>${label}</button>`;
   }).join('');
 
@@ -419,7 +419,7 @@ function changeMonth(delta) {
   else if (nextM < 0) { nextM = 11; nextY--; }
   
   if (nextY < 2026 || (nextY === 2026 && nextM < 3)) return;
-  if (nextY > 2026 || (nextY === 2026 && nextM > 11)) return;
+  if (nextY > 2026 || (nextY === 2026 && nextM > 10)) return;
 
   state.currentMonth = nextM;
   state.currentYear = nextY;
@@ -436,7 +436,7 @@ function renderMonth() {
   let targetYear = now.getFullYear();
   let targetMonth = now.getMonth();
 
-  if (targetYear < 2026 || (targetYear === 2026 && targetMonth < 3) || targetYear > 2026 || (targetYear === 2026 && targetMonth > 11)) {
+  if (targetYear < 2026 || (targetYear === 2026 && targetMonth < 3) || targetYear > 2026 || (targetYear === 2026 && targetMonth > 10)) {
     document.getElementById('today-month-btn').style.display = 'none';
   } else {
     const isCurrentMonth = (state.currentYear === targetYear && state.currentMonth === targetMonth);
@@ -446,7 +446,7 @@ function renderMonth() {
   const prevBtn = document.getElementById('prev-month');
   const nextBtn = document.getElementById('next-month');
   if(prevBtn) prevBtn.disabled = (state.currentYear === 2026 && state.currentMonth <= 3) || state.currentYear < 2026;
-  if(nextBtn) nextBtn.disabled = (state.currentYear === 2026 && state.currentMonth >= 11) || state.currentYear > 2026;
+  if(nextBtn) nextBtn.disabled = (state.currentYear === 2026 && state.currentMonth >= 10) || state.currentYear > 2026;
 }
 
 
