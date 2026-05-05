@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ============================================================
 async function loadStaff() {
   const { data, error } = await supabase
-    .from('staff')
+    .from('ogi_staff')
     .select('*')
     .order('display_order');
 
@@ -129,7 +129,7 @@ async function addStaff(e) {
   const maxOrder = staffList.reduce((max, s) => Math.max(max, s.display_order || 0), 0);
 
   const { error } = await supabase
-    .from('staff')
+    .from('ogi_staff')
     .insert({
       name,
       display_order: maxOrder + 1,
@@ -204,7 +204,7 @@ async function saveEditModal() {
   if (!isNaN(prioShibuya) && prioShibuya > 0) storePriority.shibuya = prioShibuya;
 
   const { error } = await supabase
-    .from('staff')
+    .from('ogi_staff')
     .update({
       name: document.getElementById('edit-name').value.trim(),
       role: document.getElementById('edit-role').value,
@@ -239,7 +239,7 @@ window.toggleActive = async function (id) {
   if (!confirm(`${staff.name} を${action}しますか？`)) return;
 
   const { error } = await supabase
-    .from('staff')
+    .from('ogi_staff')
     .update({ is_active: newState })
     .eq('id', id);
 
@@ -264,8 +264,8 @@ window.moveStaff = async function (id, direction) {
   const a = staffList[idx];
   const b = staffList[swapIdx];
 
-  const { error: err1 } = await supabase.from('staff').update({ display_order: b.display_order }).eq('id', a.id);
-  const { error: err2 } = await supabase.from('staff').update({ display_order: a.display_order }).eq('id', b.id);
+  const { error: err1 } = await supabase.from('ogi_staff').update({ display_order: b.display_order }).eq('id', a.id);
+  const { error: err2 } = await supabase.from('ogi_staff').update({ display_order: a.display_order }).eq('id', b.id);
 
   if (err1 || err2) {
     showToast('並び替えに失敗しました', 'error');
@@ -287,7 +287,7 @@ async function loadMonthlySettings() {
   // 年ごとにグルーピング（今年と来年）
   const years = [currentYear, currentYear + 1];
 
-  const { data, error } = await supabase.from('monthly_settings').select('*');
+  const { data, error } = await supabase.from('ogi_monthly_settings').select('*');
   if (error) { console.error(error); return; }
 
   const settingsMap = {};
@@ -320,7 +320,7 @@ async function loadMonthlySettings() {
       if (isNaN(val)) return;
 
       const { error } = await supabase
-        .from('monthly_settings')
+        .from('ogi_monthly_settings')
         .upsert({ year_month: ym, employee_days_off: val }, { onConflict: 'year_month' });
 
       if (error) {

@@ -378,7 +378,7 @@ function setupGanttHover() {
 // ============================================================
 async function loadStaffList() {
   const { data, error } = await supabase
-    .from('staff')
+    .from('ogi_staff')
     .select('*')
     .eq('is_active', true)
     .order('display_order');
@@ -395,7 +395,7 @@ async function loadRequests() {
   const endDate = formatDate(endDateObj);
 
   const { data, error } = await supabase
-    .from('shift_requests')
+    .from('ogi_shift_requests')
     .select('*, staff:staff_id(name)')
     .gte('date', startDate)
     .lte('date', endDate)
@@ -1117,7 +1117,7 @@ async function handleModalSave() {
 
   // UPDATE処理（既存レコードがある日は上書き）
   for (const req of toUpdate) {
-    const { error } = await supabase.from('shift_requests')
+    const { error } = await supabase.from('ogi_shift_requests')
       .update({ request_type: type, note: note || null, updated_at: new Date().toISOString() })
       .eq('id', req.id);
     if (error) { console.error(error); alert('更新に失敗: ' + error.message); return; }
@@ -1129,7 +1129,7 @@ async function handleModalSave() {
       staff_id: staffId, date: d, request_type: type,
       note: note || null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
     }));
-    const { error } = await supabase.from('shift_requests').insert(rows);
+    const { error } = await supabase.from('ogi_shift_requests').insert(rows);
     if (error) { console.error(error); alert('登録に失敗: ' + error.message); return; }
   }
 
@@ -1159,7 +1159,7 @@ async function handleModalDelete() {
   const label = deleteDates.length === 1 ? 'この希望を削除しますか？' : `${deleteDates.length}日分の希望をまとめて削除しますか？`;
   if (!confirm(label)) return;
 
-  const { error } = await supabase.from('shift_requests').delete().in('id', deleteIds);
+  const { error } = await supabase.from('ogi_shift_requests').delete().in('id', deleteIds);
   if (error) { console.error(error); alert('削除に失敗'); return; }
 
   closeModal();

@@ -533,8 +533,8 @@ function renderOtherList() {
 // ============================================================
 async function loadData() {
   const [staffRes, settingsRes] = await Promise.all([
-    supabase.from('staff').select('*').order('display_order'),
-    supabase.from('monthly_settings').select('*'),
+    supabase.from('ogi_staff').select('*').order('display_order'),
+    supabase.from('ogi_monthly_settings').select('*'),
   ]);
   if (staffRes.error) { console.error(staffRes.error); return; }
   if (settingsRes.error) { console.error(settingsRes.error); return; }
@@ -551,7 +551,7 @@ async function loadRequests(yearMonth) {
   const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
 
   const { data, error } = await supabase
-    .from('shift_requests')
+    .from('ogi_shift_requests')
     .select('*')
     .gte('date', startDate)
     .lte('date', endDate);
@@ -566,7 +566,7 @@ async function loadExistingAssignments() {
   state.requests = await loadRequests(yearMonth);
 
   const { data, error } = await supabase
-    .from('shift_assignments')
+    .from('ogi_shift_assignments')
     .select('*')
     .eq('year_month', yearMonth);
   if (error) { console.error(error); return; }
@@ -1730,7 +1730,7 @@ function computeRestDays(employee, dates, daysOff, requestMap, avoidDates = new 
 async function saveAssignments(yearMonth, assignments) {
   // 既存データ削除
   const { error: delError } = await supabase
-    .from('shift_assignments')
+    .from('ogi_shift_assignments')
     .delete()
     .eq('year_month', yearMonth);
   if (delError) throw delError;
@@ -1739,7 +1739,7 @@ async function saveAssignments(yearMonth, assignments) {
   const chunkSize = 100;
   for (let i = 0; i < assignments.length; i += chunkSize) {
     const chunk = assignments.slice(i, i + chunkSize);
-    const { error } = await supabase.from('shift_assignments').insert(chunk);
+    const { error } = await supabase.from('ogi_shift_assignments').insert(chunk);
     if (error) throw error;
   }
 }
@@ -2094,7 +2094,7 @@ function openCellEditor(cell, staff, dateStr) {
 
       // DB更新
       try {
-        await supabase.from('shift_assignments')
+        await supabase.from('ogi_shift_assignments')
           .upsert({
             year_month: getCurrentYearMonth(),
             staff_id: staff.id,
@@ -2285,7 +2285,7 @@ async function loadHistoryData() {
   }
 
   const { data, error } = await supabase
-    .from('shift_assignments')
+    .from('ogi_shift_assignments')
     .select('year_month, staff_id, attendance_type, work_pattern')
     .in('year_month', months);
   if (error) { console.error(error); return { months, byStaffMonth: {} }; }
