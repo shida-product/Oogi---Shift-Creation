@@ -1255,7 +1255,7 @@ function generateShifts(yearMonth, manualOverrides, manualSet, randomize = false
       }
     }
 
-    // 外部スタッフ（野口・福島）：常に平日・空欄
+    // 外部スタッフ：常に平日・空欄
     for (const ext of externalStaff) {
       if (manualSet.has(`${ext.id}_${dateStr}`)) continue;
       addAssignment(ext.id, dateStr, '平日', '');
