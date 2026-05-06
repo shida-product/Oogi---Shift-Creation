@@ -1986,10 +1986,10 @@ function renderGanttFooter(daysInMonth, sortedStaff) {
       }
 
       const eCellClass = getStatusClass(ep, eo);
-      ebisuRow += `<td class="${eCellClass.trim()}">${getSpan(ep, '薬')}/${getSpan(eo, '事')}</td>`;
+      ebisuRow += `<td class="${eCellClass.trim()}">${getSpan(ep, '薬')}<br>${getSpan(eo, '事')}</td>`;
 
       const sCellClass = getStatusClass(sp, so);
-      shibuyaRow += `<td class="${sCellClass.trim()}">${getSpan(sp, '薬')}/${getSpan(so, '事')}</td>`;
+      shibuyaRow += `<td class="${sCellClass.trim()}">${getSpan(sp, '薬')}<br>${getSpan(so, '事')}</td>`;
     }
   }
 
