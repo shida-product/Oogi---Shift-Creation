@@ -165,11 +165,13 @@
     const submitBtn = document.getElementById('btn-submit');
     const errorMsg = document.getElementById('error-msg');
 
-    // 既にセッションがあればトップへリダイレクト
+    // 既にセッションがあれば対象ページへリダイレクト
     window.addEventListener('load', async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        window.location.href = 'index.html';
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirect = urlParams.get('redirect') || 'index.html';
+        window.location.href = redirect;
       }
       passwordInput.focus();
     });
@@ -206,7 +208,9 @@
         lucide.createIcons();
         
         setTimeout(() => {
-          window.location.href = 'index.html';
+          const urlParams = new URLSearchParams(window.location.search);
+          const redirect = urlParams.get('redirect') || 'index.html';
+          window.location.href = redirect;
         }, 500);
 
       } catch (err) {

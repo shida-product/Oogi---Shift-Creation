@@ -11,14 +11,18 @@ export async function checkAuth() {
     if (error) throw error;
     
     if (!session) {
-      window.location.href = 'login.html';
+      const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+      const redirectParam = currentPath !== 'index.html' && currentPath !== '' ? `?redirect=${encodeURIComponent(currentPath)}` : '';
+      window.location.href = `login.html${redirectParam}`;
       return null;
     }
     
     return session;
   } catch (error) {
     console.error('認証エラー:', error.message);
-    window.location.href = 'login.html';
+    const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+    const redirectParam = currentPath !== 'index.html' && currentPath !== '' ? `?redirect=${encodeURIComponent(currentPath)}` : '';
+    window.location.href = `login.html${redirectParam}`;
     return null;
   }
 }
