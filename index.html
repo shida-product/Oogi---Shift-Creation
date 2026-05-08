@@ -10,10 +10,16 @@
   <link rel="stylesheet" href="css/common.css?v=9">
   <link rel="stylesheet" href="css/main.css?v=9">
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script>
-    if (localStorage.getItem('ogiyakkyoku_auth') !== 'true') {
-      window.location.href = 'login.html';
-    }
+  <script type="module">
+    import { checkAuth, setupLogoutButton } from './js/auth.js';
+    
+    // ページロード時に認証チェック
+    window.addEventListener('load', async () => {
+      const session = await checkAuth();
+      if (session) {
+        setupLogoutButton();
+      }
+    });
   </script>
 </head>
 <body>
@@ -52,6 +58,9 @@
         </div>
       </div>
 
+      <button class="btn btn--outline btn--sm" id="btn-logout" style="margin-left: 16px; padding: 4px 8px; font-size: 12px; gap: 4px;">
+        <i data-lucide="log-out" style="width:14px;height:14px;"></i> ログアウト
+      </button>
     </nav>
   </header>
 
