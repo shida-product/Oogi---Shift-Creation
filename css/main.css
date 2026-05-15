@@ -628,12 +628,7 @@
   .toolbar-surface {
     justify-content: center;
   }
-  /* 凡例はモバイルでは非表示（色で判別可能） */
-  .legend--chips { display: none; }
+  /* 凡例は横スクロールで確認可能にするため表示維持 */
   /* スタッフ選択ドロップダウンはチップUIに置き換え */
   .staff-selector { display: none; }
-  /* ヘッダーナビはアイコンのみ（テキスト非表示） */
-  .app-header__link-text { display: none; }
-  .app-header__link { padding: 8px 10px; }
 }
-
